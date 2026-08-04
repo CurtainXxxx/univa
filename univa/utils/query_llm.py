@@ -481,7 +481,8 @@ def multimodal_query(prompt: str, image_path: str=None , video_path: str=None, v
                         api_key=llm_config.get('openai_api_key', None),
                         model=llm_config.get('model', 'gpt-5-2025-08-07'),
                         messages=multimodal_messages,
-                        max_completion_tokens=8192
+                        max_completion_tokens=8192,
+                        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
                     )
 
     else:
@@ -489,7 +490,8 @@ def multimodal_query(prompt: str, image_path: str=None , video_path: str=None, v
                         api_key=llm_config.get('openai_api_key', None),
                         model=llm_config.get('model', 'gpt-5-2025-08-07'),
                         messages=multimodal_messages,
-                        max_completion_tokens=8192
+                        max_completion_tokens=8192,
+                        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
                     )
 
     content = response["content"]

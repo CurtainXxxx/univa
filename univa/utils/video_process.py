@@ -563,7 +563,7 @@ async def storyboard_generate(user_prompt: str, gentype: str=None) -> dict:
         api_key=llm_config.get('openai_api_key', None),
         model=llm_config.get('model', 'gpt-5-2025-08-07'),
         messages=messages,
-        max_tokens=8192
+        max_completion_tokens=8192
     )
 
     response_text = response["content"]
@@ -640,4 +640,3 @@ def encode_clips_to_base64(clips: List[np.ndarray], image_format: str = "JPEG") 
         all_clips_base64.append(clip_base64_frames)
 
     return all_clips_base64
-

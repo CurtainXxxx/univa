@@ -41,6 +41,7 @@ video_tracking:
 llm:
   model: "gpt-5-2025-08-07"
   openai_api_key: ""
+  base_url: ""
 
 save_service:
   base_output_path: "results/video"

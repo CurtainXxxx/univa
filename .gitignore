@@ -32,7 +32,10 @@ node_modules
 postman/
 plans/
 
- .env
+.env
+.env.*
+!*.env.example
+venv/
 *.bak
 
 
@@ -51,3 +54,13 @@ docs/
 results/
 .github
 auth_config.json
+
+# local research / demo scratch files
+*.pptx
+*.html
+*.docx
+*.pdf
+arxiv_*.xml
+arxiv_*.txt
+preview_media/
+canton_tower_*.jpg

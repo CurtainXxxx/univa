@@ -3,7 +3,9 @@ import yaml
 import json
 import torch
 import decord
+from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
 from ultralytics import SAM
 from PIL import Image
 from mcp.server.fastmcp import FastMCP
@@ -14,13 +16,24 @@ from mcp_tools.video_tracking import video_referring_segmentation
 from utils.query_llm import prepare_multimodal_messages_openai_format, query_openrouter, multimodal_query
 
 
-
 # Load configuration
-# config_path = "config/mcp_tools_config/config.yaml"
-# os.chdir(os.path.dirname(os.path.dirname(__file__)))
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/mcp_tools_config/config.yaml")
+_univa_root = Path(__file__).resolve().parents[1]
+os.chdir(str(_univa_root))
+
+# Load .env
+_env_file = _univa_root.parent / ".env"
+if _env_file.exists():
+    load_dotenv(dotenv_path=str(_env_file), override=False)
+
+config_path = _univa_root / "config" / "mcp_tools_config" / "config.yaml"
 with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
+
+# Override with env vars
+if os.environ.get("VIDEO_UNDERSTAND_MODEL_PATH"):
+    config.setdefault("video_understanding", {})["model_path"] = os.environ["VIDEO_UNDERSTAND_MODEL_PATH"]
+if os.environ.get("VIDEO_RETRIEVER_MODEL_PATH"):
+    config.setdefault("video_understanding", {})["retriever_model_path"] = os.environ["VIDEO_RETRIEVER_MODEL_PATH"]
 
 video_understanding_config = config.get('video_understanding', {})
 

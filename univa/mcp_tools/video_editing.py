@@ -3,13 +3,14 @@ import yaml
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from typing import Optional, List, Dict
 import json
 import uuid
 import shutil
-from PIL import Image 
+from PIL import Image
 
 from utils.probing import find_or_sample_clips, VLMGenerator
 from utils.wavespeed_api import runway_video_editing, vace_api
@@ -18,11 +19,24 @@ from mcp_tools.base import ToolResponse, setup_logger
 
 
 # Load configuration
-# os.chdir(os.path.dirname(os.path.dirname(__file__)))
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/mcp_tools_config/config.yaml")
-# config_path = "config/mcp_tools_config/config.yaml"
+_univa_root = Path(__file__).resolve().parents[1]
+os.chdir(str(_univa_root))
+
+# Load .env
+_env_file = _univa_root.parent / ".env"
+if _env_file.exists():
+    load_dotenv(dotenv_path=str(_env_file), override=False)
+
+config_path = _univa_root / "config" / "mcp_tools_config" / "config.yaml"
 with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
+
+# Override with env vars
+_wavespeed_key = os.environ.get("WAVESPEED_API_KEY", "")
+if _wavespeed_key:
+    for _section in ["image_gen", "video_editing", "video_gen", "audio_gen"]:
+        if _section in config:
+            config[_section]["wavespeed_api"] = _wavespeed_key
 
 video_editing_config = config.get('video_editing', {})
 

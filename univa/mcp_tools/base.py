@@ -11,16 +11,16 @@ class ToolResponse(BaseModel):
     output_path: Optional[str|List[str]] = None
     
     class Config:
-        extra = "allow"
+        extra = 'allow'
 
 
 def setup_logger(name: str, log_dir: str, log_file: str) -> logging.Logger:
-    os.makedirs(log_dir, exist_ok=True)
-    log_file_path = os.path.join(log_dir, log_file)
+    import os; tmp_dir = os.path.join(os.environ.get('TEMP', '.'), 'univa_logs'); os.makedirs(os.path.join(tmp_dir, log_dir), exist_ok=True)
+    log_file_path = os.path.join(tmp_dir, log_dir, log_file)
 
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_file_path),
             logging.StreamHandler()
