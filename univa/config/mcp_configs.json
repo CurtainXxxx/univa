@@ -32,6 +32,17 @@
         "PYTHONPATH": "D:\\univa\\univa"
       },
       "auto_confirm": []
+    },
+    "video_understanding": {
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_tools.video_understanding"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
+      "auto_confirm": []
     }
   }
 }
