@@ -432,8 +432,8 @@ class PlanActSystem:
             yield {'type': 'error', 'content': str(e)}
 
 
-async def initialize_global_agents() -> PlanActSystem:
-    config_path = config.get('mcp_servers_config')
+async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem:
+    config_path = mcp_config_path or config.get('mcp_servers_config')
 
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
