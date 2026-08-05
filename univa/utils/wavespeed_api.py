@@ -58,6 +58,35 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger()
 
 
+# 全局 requests session：显式绕过系统/环境代理。
+# 背景：本机 7897 代理对大请求体（base64 图片/视频）处理有缺陷，
+# 会导致 Wavespeed 提交任务时 ProxyError 断连。wavespeed.ai 直连即可，
+# 因此这里禁用 trust_env（不读系统代理）并强制直连。
+_requests_session = requests.Session()
+_requests_session.trust_env = False
+_requests_session.proxies = {"http": None, "https": None}
+
+
+def _get_with_retry(url, headers, retries=5, backoff=1.0, timeout=60):
+    """轮询 GET，SSL/网络异常自动重试，指数退避。
+
+    背景：Wavespeed 生成任务常需几十秒~几分钟，轮询期间本地网络
+    SSL 偶发断连（SSL: UNEXPECTED_EOF_WHILE_READING）。无重试会导致
+    整个调用崩溃、浪费已提交的任务。重试耗尽后返回空 Response，
+    让调用方走 status_code != 200 的错误分支。
+    """
+    for attempt in range(retries):
+        try:
+            return _requests_session.get(url, headers=headers, timeout=timeout)
+        except (requests.exceptions.SSLError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            logger.warning(f"GET failed (attempt {attempt + 1}/{retries}): {e}")
+            if attempt == retries - 1:
+                return requests.Response()  # 空响应，status_code != 200
+            time.sleep(backoff * (2 ** attempt))
+
+
 # =============================================================================
 # 图片生成
 # =============================================================================
@@ -88,7 +117,7 @@ def text_to_image_generate(api_key: str, prompt: str, model: str = "flux-kontext
 
     # Step 1: 提交任务
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -102,7 +131,7 @@ def text_to_image_generate(api_key: str, prompt: str, model: str = "flux-kontext
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -166,7 +195,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         }
 
         begin = time.time()
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
         if response.status_code == 200:
             result = response.json()["data"]
             request_id = result["id"]
@@ -179,7 +208,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         headers = {"Authorization": f"Bearer {api_key}"}
 
         while True:
-            response = requests.get(url, headers=headers)
+            response = _get_with_retry(url, headers=headers)
             if response.status_code == 200:
                 result = response.json()["data"]
                 status = result["status"]
@@ -218,7 +247,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         }
 
         begin = time.time()
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
         if response.status_code == 200:
             result = response.json()["data"]
             request_id = result["id"]
@@ -231,7 +260,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         headers = {"Authorization": f"Bearer {api_key}"}
 
         while True:
-            response = requests.get(url, headers=headers)
+            response = _get_with_retry(url, headers=headers)
             if response.status_code == 200:
                 result = response.json()["data"]
                 status = result["status"]
@@ -277,7 +306,7 @@ def text_to_video_generate(api_key, prompt, save_path: str = None,
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -290,7 +319,7 @@ def text_to_video_generate(api_key, prompt, save_path: str = None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -304,7 +333,7 @@ def text_to_video_generate(api_key, prompt, save_path: str = None,
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -347,7 +376,7 @@ def image_to_video_generate(api_key, prompt, image, save_path: str = None,
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -360,7 +389,7 @@ def image_to_video_generate(api_key, prompt, image, save_path: str = None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -373,7 +402,7 @@ def image_to_video_generate(api_key, prompt, image, save_path: str = None,
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -424,7 +453,7 @@ def frame_to_frame_video(api_key, prompt, images, save_path: str = None,
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -437,7 +466,7 @@ def frame_to_frame_video(api_key, prompt, images, save_path: str = None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -450,7 +479,7 @@ def frame_to_frame_video(api_key, prompt, images, save_path: str = None,
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -514,7 +543,7 @@ def audio_gen(api_key, prompt, video_url, model="mmaudio-v2", save_path=None,
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -527,7 +556,7 @@ def audio_gen(api_key, prompt, video_url, model="mmaudio-v2", save_path=None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -540,7 +569,7 @@ def audio_gen(api_key, prompt, video_url, model="mmaudio-v2", save_path=None,
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -589,7 +618,7 @@ def runway_video_editing(api_key, prompt, video_url, aspect_ratio="16:9",
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -602,7 +631,7 @@ def runway_video_editing(api_key, prompt, video_url, aspect_ratio="16:9",
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -615,7 +644,7 @@ def runway_video_editing(api_key, prompt, video_url, aspect_ratio="16:9",
                 url_name = url.split("/")[-1]
                 os.makedirs("results", exist_ok=True)
                 output_filename = save_path if save_path else f"results/{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -683,7 +712,7 @@ def vace_api(api_key, prompt, image_url: str = None, video_url: str = None,
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -696,7 +725,7 @@ def vace_api(api_key, prompt, image_url: str = None, video_url: str = None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -708,7 +737,7 @@ def vace_api(api_key, prompt, image_url: str = None, video_url: str = None,
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -753,7 +782,7 @@ def speech_gen(api_key: str, prompt: str, voice_id: str = "Wise_Woman",
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -766,7 +795,7 @@ def speech_gen(api_key: str, prompt: str, voice_id: str = "Wise_Woman",
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -779,7 +808,7 @@ def speech_gen(api_key: str, prompt: str, voice_id: str = "Wise_Woman",
                 time_ft = datetime.now().strftime("%m%d%H%M%S")
                 url_name = url.split("/")[-1]
                 output_filename = save_path if save_path else f"{time_ft}_{url_name}"
-                resp = requests.get(url, stream=True)
+                resp = _requests_session.get(url, stream=True)
                 resp.raise_for_status()
                 with open(output_filename, "wb") as f:
                     for chunk in resp.iter_content(8192):
@@ -841,7 +870,7 @@ def seedream_v4_sequential_edit(api_key: str, prompt: str, images: list[str],
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -854,7 +883,7 @@ def seedream_v4_sequential_edit(api_key: str, prompt: str, images: list[str],
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -914,7 +943,7 @@ def seedream_v4_edit(api_key: str, prompt: str, images: str | list[str],
     }
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -927,7 +956,7 @@ def seedream_v4_edit(api_key: str, prompt: str, images: str | list[str],
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -998,7 +1027,7 @@ def hailuo_i2v_pro(api_key: str, prompt: str, image: str, end_image: str = None,
         payload["end_image"] = end_image_data
 
     begin = time.time()
-    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -1011,7 +1040,7 @@ def hailuo_i2v_pro(api_key: str, prompt: str, image: str, end_image: str = None,
     headers = {"Authorization": f"Bearer {api_key}"}
 
     while True:
-        response = requests.get(url, headers=headers)
+        response = _get_with_retry(url, headers=headers)
         if response.status_code == 200:
             result = response.json()["data"]
             status = result["status"]
@@ -1023,7 +1052,7 @@ def hailuo_i2v_pro(api_key: str, prompt: str, image: str, end_image: str = None,
                 logger.info(f"Task completed. URL: {output_url}")
 
                 if save_path:
-                    resp = requests.get(output_url, stream=True)
+                    resp = _requests_session.get(output_url, stream=True)
                     resp.raise_for_status()
                     with open(save_path, "wb") as f:
                         for chunk in resp.iter_content(8192):

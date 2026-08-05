@@ -64,3 +64,9 @@ arxiv_*.xml
 arxiv_*.txt
 preview_media/
 canton_tower_*.jpg
+# UniVA-Bench 数据集（4GB，第三方数据，从 HF 重新下载即可）
+/datasets/
+
+# 评测冒烟产物
+/eval/tmp/
+/eval/outputs/
