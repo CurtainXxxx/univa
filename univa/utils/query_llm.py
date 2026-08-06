@@ -6,16 +6,29 @@ import cv2
 from typing import List, Optional, Tuple, Union, Dict
 import json
 import numpy as np
+from pathlib import Path
+from dotenv import load_dotenv
 from utils.text_process import extract_dict
 
 
-os.chdir(os.path.dirname(os.path.dirname(__file__)))
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/mcp_tools_config/config.yaml")
+_univa_root = Path(__file__).resolve().parents[1]
+os.chdir(str(_univa_root))
+
+# 加载 .env（工具子进程必须自己加载，主进程环境变量不会传递过来）
+_env_file = _univa_root.parent / ".env"
+if _env_file.exists():
+    load_dotenv(dotenv_path=str(_env_file), override=False)
+
+config_path = _univa_root / "config" / "mcp_tools_config" / "config.yaml"
 import yaml
 with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
 
 llm_config = config.get('llm', {})
+
+# .env 的 LLM_OPENAI_API_KEY 覆盖 llm 段的 openai_api_key
+if os.environ.get("LLM_OPENAI_API_KEY"):
+    llm_config["openai_api_key"] = os.environ["LLM_OPENAI_API_KEY"]
 
 
 def _encode_image_to_base64(image_path: str) -> str:
@@ -420,7 +433,8 @@ def refine_gen_prompt(prompt: str, media_type: str = "image") -> str:
                         api_key=llm_config.get('openai_api_key', None),
                         model=llm_config.get('model', 'gpt-5-2025-08-07'),
                         messages=message,
-                        max_completion_tokens=8192
+                        max_completion_tokens=8192,
+                        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
                     )
     return_content = response.get("content", "")
     context_json = extract_dict(return_content)
@@ -438,7 +452,8 @@ def audio_prompt_gen(video_path: str) -> str:
         api_key=llm_config.get('openai_api_key', None),
         model=llm_config.get('model', 'gpt-5-2025-08-07'),
         messages=message,
-        max_completion_tokens=8192
+        max_completion_tokens=8192,
+        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
     )
 
     content = response.get("content")
@@ -458,7 +473,8 @@ def speech_prompt_gen(video_path: str) -> str:
         api_key=llm_config.get('openai_api_key', None),
         model=llm_config.get('model', 'gpt-5-2025-08-07'),
         messages=message,
-        max_completion_tokens=8192
+        max_completion_tokens=8192,
+        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
     )
 
     content = response.get("content")

@@ -11,16 +11,29 @@ import json
 import math
 
 from typing import List, Union
+from pathlib import Path
+from dotenv import load_dotenv
 from decord import VideoReader, cpu, DECORDError
 
 
-os.chdir(os.path.dirname(os.path.dirname(__file__)))
-config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config/mcp_tools_config/config.yaml")
+_univa_root = Path(__file__).resolve().parents[1]
+os.chdir(str(_univa_root))
+
+# 加载 .env（工具子进程必须自己加载）
+_env_file = _univa_root.parent / ".env"
+if _env_file.exists():
+    load_dotenv(dotenv_path=str(_env_file), override=False)
+
+config_path = _univa_root / "config" / "mcp_tools_config" / "config.yaml"
 import yaml
 with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
 
 llm_config = config.get('llm', {})
+
+# .env 的 LLM_OPENAI_API_KEY 覆盖 llm 段的 openai_api_key
+if os.environ.get("LLM_OPENAI_API_KEY"):
+    llm_config["openai_api_key"] = os.environ["LLM_OPENAI_API_KEY"]
 logger = logging.getLogger(__name__)
 
 
@@ -563,7 +576,8 @@ async def storyboard_generate(user_prompt: str, gentype: str=None) -> dict:
         api_key=llm_config.get('openai_api_key', None),
         model=llm_config.get('model', 'gpt-5-2025-08-07'),
         messages=messages,
-        max_completion_tokens=8192
+        max_completion_tokens=8192,
+        base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
     )
 
     response_text = response["content"]
