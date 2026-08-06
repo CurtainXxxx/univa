@@ -118,7 +118,7 @@ def image2image_generate(prompt: str, image_path: str|list[str]):
 
 
 @mcp.tool()
-def sequential_image_gen(prompt: str, images: list[str], images_num: int = 2) -> str:
+def sequential_image_gen(prompt: str, images: list[str], images_num: int = 2) -> ToolResponse:
     """
     Generates a series of same style or consistency images or based on input images and a prompt.
     This tool is useful for creating multiple related images based on input images and a prompt.

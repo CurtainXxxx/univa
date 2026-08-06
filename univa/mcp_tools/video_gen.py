@@ -76,7 +76,7 @@ mcp = FastMCP("Video_Generation_Server")
 # 工具1: text2video_gen — 文本 → 视频（最常用）
 # =============================================================================
 @mcp.tool()
-async def text2video_gen(prompt: str) -> str:
+async def text2video_gen(prompt: str) -> Dict:
     """
     根据文本描述生成约 5 秒的短视频。
 
@@ -226,7 +226,7 @@ async def storyvideo_gen(prompt: str) -> ToolResponse:
 # 工具3: entity2video — 用户提供角色图片的故事视频
 # =============================================================================
 @mcp.tool()
-async def entity2video(prompt: str, images: List[str]) -> str:
+async def entity2video(prompt: str, images: List[str]) -> ToolResponse:
     """
     与 storyvideo_gen 类似，但角色图片由用户提供而非 AI 生成。
 
@@ -321,7 +321,7 @@ async def entity2video(prompt: str, images: List[str]) -> str:
 # 工具4: image2video_gen — 图片 + 文本 → 视频（图生视频）
 # =============================================================================
 @mcp.tool()
-async def image2video_gen(prompt: str, image_path: str) -> str:
+async def image2video_gen(prompt: str, image_path: str) -> Dict:
     """
     以一张图片为视觉参考，生成约 5 秒视频。
 
@@ -386,7 +386,7 @@ async def video_extension(prompt: str, video_path: str) -> Dict:
 # 工具6: frame2frame_video_gen — 首帧到末帧过渡（帧间插值）
 # =============================================================================
 @mcp.tool()
-async def frame2frame_video_gen(prompt: str, first_frame_path: str, last_frame_path: str) -> str:
+async def frame2frame_video_gen(prompt: str, first_frame_path: str, last_frame_path: str) -> Dict:
     """
     给定首帧和末帧，生成中间过渡视频。
 
