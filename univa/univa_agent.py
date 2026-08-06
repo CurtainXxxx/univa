@@ -464,6 +464,17 @@ async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem
     return global_plan_act_system
 
 
+def format_result(result: Dict) -> str:
+    """把 execute_task 返回的 {plan, execution} 格式化成缩进的完整 JSON。
+
+    保留原始层级结构与完整信息（不截断 message/content），
+    用 2 空格缩进让嵌套关系清晰可读。
+    """
+    if not result:
+        return "(空结果)"
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
 async def main():
     system = await initialize_global_agents()
     session_id = "test_interactive_session_001"
@@ -484,9 +495,8 @@ async def main():
                 result = await system.execute_task(session_id, input_prompt)
 
                 print("\n" + "="*60)
-                print("\U0001f4ca Result:")
-                print(result)
-                print("completed.")
+                print(format_result(result))
+                print("\ncompleted.")
                 print("="*60)
 
             except KeyboardInterrupt:
