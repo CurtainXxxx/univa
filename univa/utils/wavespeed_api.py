@@ -87,6 +87,25 @@ def _get_with_retry(url, headers, retries=5, backoff=1.0, timeout=60):
             time.sleep(backoff * (2 ** attempt))
 
 
+def _post_with_retry(url, headers, payload, retries=4, backoff=1.0, timeout=120):
+    """提交任务的 POST，SSL/网络异常自动重试，指数退避。
+
+    与 _get_with_retry 同理：提交阶段也可能 SSL 偶发断连。
+    重试耗尽后返回空 Response，让调用方走 status_code != 200 的错误分支。
+    """
+    for attempt in range(retries):
+        try:
+            return _requests_session.post(url, headers=headers,
+                                          data=json.dumps(payload), timeout=timeout)
+        except (requests.exceptions.SSLError,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as e:
+            logger.warning(f"POST failed (attempt {attempt + 1}/{retries}): {e}")
+            if attempt == retries - 1:
+                return requests.Response()
+            time.sleep(backoff * (2 ** attempt))
+
+
 # =============================================================================
 # 图片生成
 # =============================================================================
@@ -117,7 +136,7 @@ def text_to_image_generate(api_key: str, prompt: str, model: str = "flux-kontext
 
     # Step 1: 提交任务
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -195,7 +214,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         }
 
         begin = time.time()
-        response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+        response = _post_with_retry(url, headers, payload)
         if response.status_code == 200:
             result = response.json()["data"]
             request_id = result["id"]
@@ -247,7 +266,7 @@ def image_to_image_generate(api_key, prompt, images, model="flux-kontext-pro",
         }
 
         begin = time.time()
-        response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+        response = _post_with_retry(url, headers, payload)
         if response.status_code == 200:
             result = response.json()["data"]
             request_id = result["id"]
@@ -306,7 +325,7 @@ def text_to_video_generate(api_key, prompt, save_path: str = None,
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -376,7 +395,7 @@ def image_to_video_generate(api_key, prompt, image, save_path: str = None,
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -453,7 +472,7 @@ def frame_to_frame_video(api_key, prompt, images, save_path: str = None,
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -543,7 +562,7 @@ def audio_gen(api_key, prompt, video_url, model="mmaudio-v2", save_path=None,
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -618,7 +637,7 @@ def runway_video_editing(api_key, prompt, video_url, aspect_ratio="16:9",
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -712,7 +731,7 @@ def vace_api(api_key, prompt, image_url: str = None, video_url: str = None,
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -782,7 +801,7 @@ def speech_gen(api_key: str, prompt: str, voice_id: str = "Wise_Woman",
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -870,7 +889,7 @@ def seedream_v4_sequential_edit(api_key: str, prompt: str, images: list[str],
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -943,7 +962,7 @@ def seedream_v4_edit(api_key: str, prompt: str, images: str | list[str],
     }
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
@@ -1027,7 +1046,7 @@ def hailuo_i2v_pro(api_key: str, prompt: str, image: str, end_image: str = None,
         payload["end_image"] = end_image_data
 
     begin = time.time()
-    response = _requests_session.post(url, headers=headers, data=json.dumps(payload))
+    response = _post_with_retry(url, headers, payload)
     if response.status_code == 200:
         result = response.json()["data"]
         request_id = result["id"]
