@@ -401,6 +401,8 @@
         <p><span class="fix">实现：</span>重写长视频编辑工具（原版是 Linux 硬编码 + VLM probing 不可用）：ffmpeg 切 5s 片 → 云端 VACE 逐片编辑 → 失败片原片顶替 → 拼接。<span class="fix">坑1：</span>切分文件名扩展名被 replace 吞掉导致 ffmpeg 报错；<span class="fix">坑2：</span>VACE 要求 duration≥5，末片 4.8s 报 400；<span class="fix">坑3：</span>抽样模式只拼编辑段丢了中间内容（307s→31s），已重构为按时间轴插回原片。</p></div>
       <div class="bug"><h3>⑩ 成本教训：VACE 单次约 $0.5</h3>
         <p><span class="fix">实测：</span>lve 12 片 + v2v 6 片共 18 次调用，7 次成功即耗掉 ~$3.5 余额（第 8 次起 Insufficient credits）。比预估贵 3-5 倍。全片编辑 $6/条不可持续 → 改用 max_clips 抽样。等充值后再跑。</p></div>
+      <div class="bug"><h3>⑪ SingleAgent 对照实现</h3>
+        <p><span class="fix">实现：</span>结论2 对照——SingleAgent（一个模型同时规划+执行，tool_call_limit=50 一次对话连环调工具）vs Plan-Act（双 Agent 分工）。runner 新增 --mode single，与 agent 模式共用同一 MCP 连接与 session 记忆，只差分工方式。</p></div>
     </div>
   </section>
 
@@ -490,7 +492,7 @@
       <div class="step-row"><span class="no">4</span><span class="txt">lvu 直连评测（direct 模式，绕开 PlanAgent 规划不稳）</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">5</span><span class="txt">实现 long_video_edit 分片编辑合并，打通 lve/v2v 长视频</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">6</span><span class="txt">全量跑 57 条任务，汇总四类指标</span><span class="st todo">待办</span></div>
-      <div class="step-row"><span class="no">7</span><span class="txt">实现 Single-Agent 对照 + Memory 消融</span><span class="st todo">待办</span></div>
+      <div class="step-row"><span class="no">7</span><span class="txt">实现 Single-Agent 对照（已完）+ Memory 消融（待办）</span><span class="st doing">进行中</span></div>
       <div class="step-row"><span class="no">8</span><span class="txt">AutoDL 跑 seg 分割（需 GPU）</span><span class="st todo">待办</span></div>
     </div>
   </section>

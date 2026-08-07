@@ -72,6 +72,33 @@ def generate_todo_progress_event(plan_data: Dict) -> Dict:
     }
 
 
+def extract_plan_from_content(content: str) -> Optional[Dict]:
+    """从 LLM 输出里提取执行计划 JSON（支持 ```json 代码块或裸 JSON）。
+
+    返回 dict（含 execution_plan）或原字符串（解析失败时）。
+    """
+    if not content or not isinstance(content, str):
+        return content
+    try:
+        match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            start = content.find('{')
+            end = content.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                json_str = content[start:end+1]
+            else:
+                return content
+
+        parsed_content = json.loads(json_str)
+        if "execution_plan" in parsed_content:
+            return parsed_content
+        return content
+    except (json.JSONDecodeError, Exception):
+        return content
+
+
 class PlanAgent:
     def __init__(self, mcp_tools: MultiMCPTools, plan_db):
         self.mcp_tools = mcp_tools
@@ -111,24 +138,7 @@ class PlanAgent:
         return "\n".join(tools_info) if tools_info else "No tools available"
 
     def extract_plan_from_content(self, content: str) -> Optional[Dict]:
-        try:
-            match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
-            if match:
-                json_str = match.group(1)
-            else:
-                start = content.find('{')
-                end = content.rfind('}')
-                if start != -1 and end != -1 and end > start:
-                    json_str = content[start:end+1]
-                else:
-                    return content
-
-            parsed_content = json.loads(json_str)
-            if "execution_plan" in parsed_content:
-                return parsed_content
-            return content
-        except (json.JSONDecodeError, Exception):
-            return content
+        return extract_plan_from_content(content)
 
     async def generate_plan(self, session_id, user_request: str) -> Optional[Dict]:
         input_context = f"User Request: {user_request}\n"
@@ -321,6 +331,107 @@ class ActAgent:
         return plan
 
 
+# =============================================================================
+# SingleAgent：结论2 对照（无 Plan-Act 分工）
+# 一个 Agent 同时承担规划与执行：先输出计划 JSON → 自己连环调用工具执行
+# → 最后输出带执行状态更新的完整计划 JSON。tool_call_limit=50 是关键，
+# 允许一次对话内多次调用工具（Plan-Act 的 ActAgent 每步 limit=1）。
+# =============================================================================
+SINGLE_ACT_INSTRUCTIONS = """你是视频任务的规划者兼执行者（Single Agent，没有独立的 Plan/Act 分工）。
+
+工作流程（一轮完成全部）：
+1. 首先根据用户请求，输出符合下方格式的完整执行计划 JSON（execution_plan，含 steps）；
+2. 然后立即自己调用工具，按顺序执行计划中的每个 step；
+3. 全部执行完毕后，最后输出【更新后的完整计划 JSON】——每个 step 的 status 填实际执行结果（success 或 failed），output 填实际产出（成功时填工具返回的文件路径）。
+
+必须遵守：
+- 每个 step 只做一件事，只调用一个工具；
+- output_path / output 必须填工具真实返回的文件路径，禁止编造；
+- 某步失败时如实填 status=failed，并继续尝试剩余步骤（不要整体放弃）；
+- 最终输出必须且只能是更新后的计划 JSON，不要附加解释文字。"""
+
+
+class SingleAgent:
+    """结论2 对照组：Single Agent（一个模型同时规划+执行）。
+
+    与 PlanActSystem（PlanAgent 规划 → ActAgent 执行）对比使用：
+    相同模型、相同工具集、相同 session 记忆，仅差异在"分工"。
+    """
+
+    def __init__(self, mcp_tools: MultiMCPTools, db=None):
+        self.mcp_tools = mcp_tools
+
+        plan_prompt = load_prompt("plan")
+        full_instructions = f"{plan_prompt}\n\n{SINGLE_ACT_INSTRUCTIONS}"
+
+        model_provider = config.get('plan_model_provider', 'openai')
+        model_id = config.get('plan_model_id', 'gpt-5-2025-08-07')
+        model_api_key = config.get('plan_model_api_key', '')
+        model_base_url = config.get('plan_model_base_url', '')
+        model_extra_params = config.get('plan_model_extra_params', '')
+
+        self.agent = Agent(
+            name="Univideo Single Agent",
+            model=create_model(
+                provider=model_provider,
+                model_id=model_id,
+                api_key=model_api_key,
+                base_url=model_base_url or None,
+                extra_params=model_extra_params,
+            ),
+            instructions=full_instructions,
+            tools=[mcp_tools],
+            tool_call_limit=50,  # 关键：一次对话内规划+连环调工具
+            db=db,
+            add_history_to_context=True,
+            num_history_messages=10,
+            session_state={"execution_history": []},
+        )
+
+    async def run(self, session_id, user_request: str) -> Dict[str, Any]:
+        """单轮执行：规划 + 执行 + 返回更新后的计划。
+
+        Returns:
+            与 PlanActSystem.execute_task 相同的 {plan, execution} 结构，
+            其中 execution[step_num] = {success, output_path, message}，
+            便于 runner 用同一套解析逻辑。
+        """
+        response = await self.agent.arun(
+            input=user_request,
+            stream=False,
+            session_id=session_id,
+        )
+
+        plan = extract_plan_from_content(response.content)
+
+        # 防御：没解析出计划 JSON
+        if not isinstance(plan, dict) or 'execution_plan' not in plan:
+            return {
+                "plan": plan,
+                "execution": {
+                    1: {
+                        "success": False,
+                        "message": f"SingleAgent 未能生成有效计划: {str(plan)[:200]}",
+                        "output_path": None,
+                    }
+                }
+            }
+
+        # 把更新后的计划 steps 转成 execution 字典（与 PlanAct 输出对齐）
+        execution: Dict[int, Any] = {}
+        steps = plan.get('execution_plan', {}).get('steps', [])
+        for i, step in enumerate(steps):
+            status = step.get('status', 'failed')
+            output = step.get('output') or step.get('output_path')
+            execution[i + 1] = {
+                'success': str(status).lower() in ('true', 'success', 'completed'),
+                'output_path': output if (output and os.path.exists(str(output))) else None,
+                'message': f"{step.get('action_description', '')} -> {step.get('tool', {})}",
+            }
+
+        return {"plan": plan, "execution": execution}
+
+
 class PlanActSystem:
     def __init__(self, mcp_command: List[str], db_file: str = "plan_act_system"):
         mcp_tools_path = config.get('mcp_tools_path')
@@ -336,6 +447,7 @@ class PlanActSystem:
         self._plan_db = SqliteDb(db_file=f"{db_file}_plan.db")
         self.plan_agent = None
         self.act_agent = None
+        self.single_agent = None
 
     async def __aenter__(self):
         await self.mcp_tools.connect()
@@ -345,6 +457,16 @@ class PlanActSystem:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.mcp_tools.close()
+
+    async def execute_single(self, session_id, user_request: str) -> Dict[str, Any]:
+        """Single-Agent 对照执行：同一系统同一 MCP 连接，只换执行方式。
+
+        结论2 实验用：Plan-Act vs Single-Agent 的差异仅在于分工方式，
+        MCP 工具、模型、session 记忆都保持一致。
+        """
+        if self.single_agent is None:
+            self.single_agent = SingleAgent(self.mcp_tools, self._plan_db)
+        return await self.single_agent.run(session_id, user_request)
 
     async def execute_task(self, session_id, user_request: str) -> Dict[str, Any]:
         execution_plan = await self.plan_agent.generate_plan(session_id, user_request)

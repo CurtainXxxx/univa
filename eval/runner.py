@@ -143,11 +143,18 @@ def run_direct(task: str, item: dict, api_key: str) -> dict:
     return {"success": False, "message": f"direct 不支持 {task}"}
 
 
-async def run_agent_item(system, task: str, item: dict, session_id: str) -> dict:
-    """走 Agent 链路执行单个任务。"""
+async def run_agent_item(system, task: str, item: dict, session_id: str,
+                         method: str = "planact") -> dict:
+    """走 Agent 链路执行单个任务。
+
+    method: "planact"=Plan-Act 双 Agent（默认）；"single"=Single Agent 对照。
+    """
     request = build_request(task, item)
     try:
-        result = await system.execute_task(session_id, request)
+        if method == "single":
+            result = await system.execute_single(session_id, request)
+        else:
+            result = await system.execute_task(session_id, request)
     except Exception as e:
         import traceback
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()[-800:]}
@@ -203,7 +210,7 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tasks", required=True, help="逗号分隔: lt2v,it2v,v2v,lve,lvu,seg")
     parser.add_argument("--items", default="0", help="条目索引，逗号分隔: 0,1,2")
-    parser.add_argument("--mode", default="agent", choices=["agent", "direct"])
+    parser.add_argument("--mode", default="agent", choices=["agent", "single", "direct"])
     parser.add_argument("--mcp-config", default=None, help="MCP 配置文件路径")
     parser.add_argument("--run-id", default="run1")
     args = parser.parse_args()
@@ -215,10 +222,11 @@ async def main():
     run_dir = OUT_ROOT / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.mode == "agent":
+    if args.mode in ("agent", "single"):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "univa"))
         from univa.univa_agent import initialize_global_agents
         system = await initialize_global_agents(mcp_config_path=args.mcp_config)
+        method = "single" if args.mode == "single" else "planact"
     else:
         import os
         from dotenv import load_dotenv
@@ -247,8 +255,9 @@ async def main():
             task_dir.mkdir(exist_ok=True)
 
             print(f"  执行 {item_id} ...")
-            if args.mode == "agent":
-                result = await run_agent_item(system, task, item, f"{args.run_id}|{task}|{idx}")
+            if args.mode in ("agent", "single"):
+                result = await run_agent_item(system, task, item, f"{args.run_id}|{task}|{idx}",
+                                              method=method)
             else:
                 result = run_direct(task, item, api_key)
                 result["task"] = task
@@ -264,7 +273,7 @@ async def main():
             print(f"  {status} {item_id}: output={result.get('output_path')}")
             all_results.append(manifest)
 
-    if args.mode == "agent":
+    if args.mode in ("agent", "single"):
         await system.__aexit__(None, None, None)
 
     # 汇总
