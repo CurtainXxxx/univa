@@ -166,6 +166,8 @@
   .result-card { border-radius: 12px; padding: 20px; text-align: center; background: var(--card); border: 1px solid var(--line); }
   .result-card .big { font-size: 34px; font-weight: 700; color: var(--blue); }
   .result-card .lbl { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .result-card.hot { background: #F3FAF7; border-color: var(--green); }
+  .acc-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--body); font-weight: 700; }
   .acc-line { margin-top: 20px; }
   .acc-bar { height: 14px; background: var(--light); border-radius: 99px; overflow: hidden; margin-top: 8px; }
   .acc-fill { height: 100%; width: 77%; background: linear-gradient(90deg, var(--sky), var(--green)); border-radius: 99px; }
@@ -338,7 +340,7 @@
         <h3><span class="tdot"></span>理解已通</h3>
         <ul>
           <li>vision2text_gen<small>陶瓷、宇宙视频描述</small></li>
-          <li>lvu QA 评估<small>77% 准确率（10/13）</small></li>
+          <li>lvu QA 评估<small>74.8% 准确率（103 题全 QA）</small></li>
           <li>multimodal_query<small>图片/视频理解</small></li>
         </ul>
       </div>
@@ -354,24 +356,54 @@
     <div class="test-note"><strong>Runway 风格迁移：</strong>模型已失效（Model not found），改用 VACE 替代。</div>
   </section>
 
+  <!-- Slide 6b: 实验结果汇总 -->
+  <section class="slide">
+    <div class="eyebrow">实验结果汇总</div>
+    <div class="title">到目前为止的实测数据</div>
+    <div class="question">指标验证 + 各任务产出 + 成本（截至 2026-08）</div>
+    <div class="result-row">
+      <div class="result-card"><div class="big">0.2776</div><div class="lbl">CLIP 验证（论文 UniVA 0.2814）</div></div>
+      <div class="result-card"><div class="big">1.0 / 0.57 / 0.05</div><div class="lbl">DINO 区分度（自/同类/异类）</div></div>
+      <div class="result-card"><div class="big">5 / 5</div><div class="lbl">MLLM Judge 主观打分</div></div>
+      <div class="result-card hot"><div class="big">74.8%</div><div class="lbl">lvu 全量 QA（论文 76%）</div></div>
+    </div>
+    <div style="margin-top:18px">
+      <table class="ds-table">
+        <tr><th>任务</th><th>产出</th><th>实测指标</th><th>成本</th></tr>
+        <tr><td><span class="chip">entity2video</span> 多图故事</td><td>15s 成片（363帧 864×496）</td><td>链路全通</td><td>3 段生成</td></tr>
+        <tr><td><span class="chip">lve</span> 长视频编辑</td><td>61s 成片（59s 源，5/12 片编辑）</td><td>CLIP 0.2154 · DINO 0.56</td><td>12 次 VACE</td></tr>
+        <tr><td><span class="chip">v2v</span> 风格转换</td><td>31s 抽样输出（307s 源，6 片抽 2 成功）</td><td>链路通，时间轴 bug 已修</td><td>6 次 VACE</td></tr>
+        <tr><td><span class="chip">lt2v</span> SingleAgent 首测</td><td>5s 视频生成成功</td><td>重复提交 2 笔（护栏后修复）</td><td>2 笔</td></tr>
+      </table>
+    </div>
+    <div class="test-note" style="margin-top:16px">
+      <strong>成本合计 ~$4.5</strong>：大头是 VACE 编辑（单次 ~$0.5），已用抽样策略控制。
+      本地指标（CLIP/DINO）零成本可重复算。
+    </div>
+  </section>
+
   <!-- Slide 7: lvu result -->
   <section class="slide">
     <div class="eyebrow">理解类成果</div>
-    <div class="title">lvu 视频理解评估</div>
-    <div class="question">长视频问答 · 33 分钟视频 × 13 问</div>
+    <div class="title">lvu 视频理解评估（全量）</div>
+    <div class="question">10 个长视频 · 103 题全 QA 口径 · 64 帧均匀采样</div>
     <div class="result-row">
-      <div class="result-card"><div class="big">10/13</div><div class="lbl">答对题数</div></div>
-      <div class="result-card"><div class="big">77%</div><div class="lbl">准确率</div></div>
-      <div class="result-card"><div class="big">128</div><div class="lbl">抽帧数</div></div>
-      <div class="result-card"><div class="big">¥0.5</div><div class="lbl">单视频成本</div></div>
+      <div class="result-card hot"><div class="big">74.8%</div><div class="lbl">按题目准确率（77/103）</div></div>
+      <div class="result-card"><div class="big">74.7%</div><div class="lbl">按视频平均准确率</div></div>
+      <div class="result-card"><div class="big">10/10</div><div class="lbl">视频全部 ≥60%，8 条 ≥70%</div></div>
+      <div class="result-card"><div class="big">64</div><div class="lbl">抽帧数 / 视频</div></div>
     </div>
     <div class="acc-line">
-      <div style="font-size:14px;font-weight:700;color:var(--ink)">准确率 77%</div>
-      <div class="acc-bar"><div class="acc-fill"></div></div>
+      <div class="acc-label"><span>InternVL3-38B（论文基线）</span><span>75%</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:75%;opacity:.55"></div></div>
+      <div class="acc-label" style="margin-top:8px;"><span>UniVA（论文）</span><span>76%</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:76%;opacity:.55"></div></div>
+      <div class="acc-label" style="margin-top:8px;"><span style="color:#0B5D46;">我们（qwen-vl-max · 64帧全QA）</span><span style="color:#0B5D46;">74.8%</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:74.8%"></div></div>
     </div>
     <div class="test-note" style="margin-top:18px">
-      <strong>对照论文：</strong>论文中 InternVL3-38B 为 0.75、UniVA 为 0.76，我们的 0.77 达到论文水平。
-      答错的 3 题多为"精确时间点/局部细节"题，提高帧数可改善。
+      <strong>对照论文：</strong>论文 InternVL3-38B=0.75、UniVA=0.76，我们 0.748 基本对齐。
+      口径说明：选择题字母精确匹配 + 简答题 LLM judge；含 4 个简答题（无 options 字段）。
     </div>
   </section>
 
@@ -454,6 +486,12 @@
       <div class="commit"><span class="hash">e6f7524</span><span class="msg">新增 eval/metrics.py 三指标</span><span class="badge feat">feat</span></div>
       <div class="commit"><span class="hash">9cae837</span><span class="msg">metrics.py 记录实测结果</span><span class="badge docs">docs</span></div>
       <div class="commit"><span class="hash">ec0c342</span><span class="msg">entity2video 幻觉修复 + runner</span><span class="badge fix">fix</span></div>
+      <div class="commit"><span class="hash">0d3af12</span><span class="msg">entity2video 完整链路验证通过</span><span class="badge docs">docs</span></div>
+      <div class="commit"><span class="hash">57c3e3e</span><span class="msg">lvu 全 QA 评测 74.8%</span><span class="badge feat">feat</span></div>
+      <div class="commit"><span class="hash">a8c24ad</span><span class="msg">long_video_edit 分片编辑</span><span class="badge feat">feat</span></div>
+      <div class="commit"><span class="hash">b2a2494</span><span class="msg">SingleAgent 对照实现</span><span class="badge feat">feat</span></div>
+      <div class="commit"><span class="hash">5cefb3f</span><span class="msg">统一 venv + 成本护栏</span><span class="badge fix">fix</span></div>
+      <div class="commit"><span class="hash">5450466</span><span class="msg">记录扣费 2 笔实锤</span><span class="badge docs">docs</span></div>
     </div>
   </section>
 
@@ -464,20 +502,20 @@
     <div class="question">明确阻碍，逐项推进</div>
     <div class="bugs">
       <div class="bug">
-        <h3>① 长视频编辑（lve）分片问题</h3>
-        <p>VACE 单次仅支持 ~5s，lve 源视频 58s-13min。需实现"分片→编辑→合并"（long_video_edit）。</p>
-      </div>
-      <div class="bug">
-        <h3>② 分割（seg）需 GPU</h3>
+        <h3>① 分割（seg）需 GPU</h3>
         <p>video_tracking 依赖 Sa2VA（本地 CUDA），本地 AMD 核显跑不了，计划 AutoDL 3090。</p>
       </div>
       <div class="bug">
-        <h3>③ Agent 条件逻辑冗余执行</h3>
+        <h3>② Agent 条件逻辑冗余执行</h3>
         <p>PlanAgent 生成"if 失败 then"计划时，ActAgent 不理解条件语义，成功仍执行后续步骤（浪费 API）。</p>
       </div>
       <div class="bug">
-        <h3>④ 对照实验未做</h3>
-        <p>Single-Agent 对照（结论2）、Memory 消融（结论3）尚未实现，需改 univa_agent.py。</p>
+        <h3>③ Memory 消融未做</h3>
+        <p>User/Global 记忆未实现（论文设计 3 层，仓库只有 Task 层），结论3 的消融实验待做。</p>
+      </div>
+      <div class="bug">
+        <h3>④ 对照实验待跑</h3>
+        <p>Single-Agent vs Plan-Act 代码已实现（--mode single），余额充足后跑小样本对照。</p>
       </div>
     </div>
   </section>
@@ -501,7 +539,7 @@
 
   <div class="footer">
     <span>UniVA · 实验进度</span>
-    <span class="page" id="pageNum">01 / 12</span>
+    <span class="page" id="pageNum">01 / 13</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>
