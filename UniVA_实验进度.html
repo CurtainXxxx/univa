@@ -284,7 +284,7 @@
         <h3><span class="tdot"></span>编辑 Editing</h3>
         <ul>
           <li>style_transfer ✅<small>VACE 风格迁移</small></li>
-          <li>长视频编辑 ⚠️<small>VACE 单次仅 5s，需分片</small></li>
+          <li>long_video_edit ✅<small>分片→编辑→合并链路已通（lve 61s 成片）</small></li>
         </ul>
       </div>
       <div class="status-card pending">
@@ -397,6 +397,10 @@
         <p><span class="fix">修复：</span>规划失败时不再报错崩溃，而是返回明确提示信息。</p></div>
       <div class="bug"><h3>⑧ lvu 评测口径修正</h3>
         <p><span class="fix">发现：</span>只测第 1 问 + 32 帧只有 60%；改成每条视频全部 QA（选择题字母匹配 + 简答题 LLM judge）+ 64 帧后达到 74.8%，与论文 76% 基本一致。评测口径决定结论。</p></div>
+      <div class="bug"><h3>⑨ long_video_edit 实现 + 三个坑</h3>
+        <p><span class="fix">实现：</span>重写长视频编辑工具（原版是 Linux 硬编码 + VLM probing 不可用）：ffmpeg 切 5s 片 → 云端 VACE 逐片编辑 → 失败片原片顶替 → 拼接。<span class="fix">坑1：</span>切分文件名扩展名被 replace 吞掉导致 ffmpeg 报错；<span class="fix">坑2：</span>VACE 要求 duration≥5，末片 4.8s 报 400；<span class="fix">坑3：</span>抽样模式只拼编辑段丢了中间内容（307s→31s），已重构为按时间轴插回原片。</p></div>
+      <div class="bug"><h3>⑩ 成本教训：VACE 单次约 $0.5</h3>
+        <p><span class="fix">实测：</span>lve 12 片 + v2v 6 片共 18 次调用，7 次成功即耗掉 ~$3.5 余额（第 8 次起 Insufficient credits）。比预估贵 3-5 倍。全片编辑 $6/条不可持续 → 改用 max_clips 抽样。等充值后再跑。</p></div>
     </div>
   </section>
 
@@ -484,7 +488,7 @@
       <div class="step-row"><span class="no">2</span><span class="txt">跑通 lt2v / it2v 实验脚本（Agent 链路）</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">3</span><span class="txt">修复 entity2video 故事板幻觉 + 目录名，验证完整版</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">4</span><span class="txt">lvu 直连评测（direct 模式，绕开 PlanAgent 规划不稳）</span><span class="st done">已完成</span></div>
-      <div class="step-row"><span class="no">5</span><span class="txt">实现 long_video_edit 分片编辑合并，打通 lve/v2v 长视频</span><span class="st todo">待办</span></div>
+      <div class="step-row"><span class="no">5</span><span class="txt">实现 long_video_edit 分片编辑合并，打通 lve/v2v 长视频</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">6</span><span class="txt">全量跑 57 条任务，汇总四类指标</span><span class="st todo">待办</span></div>
       <div class="step-row"><span class="no">7</span><span class="txt">实现 Single-Agent 对照 + Memory 消融</span><span class="st todo">待办</span></div>
       <div class="step-row"><span class="no">8</span><span class="txt">AutoDL 跑 seg 分割（需 GPU）</span><span class="st todo">待办</span></div>

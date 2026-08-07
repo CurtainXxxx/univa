@@ -8,11 +8,7 @@ from mcp.server.fastmcp import FastMCP
 
 from typing import Optional, List, Dict
 import json
-import uuid
-import shutil
-from PIL import Image
 
-from utils.probing import find_or_sample_clips, VLMGenerator
 from utils.wavespeed_api import runway_video_editing, vace_api
 from utils.video_process import save_last_frame_decord
 
@@ -868,278 +864,176 @@ def repainting(
 
 
 
-# @mcp.tool()
+@mcp.tool()
 def long_video_edit(
     video: str,
-    task: str,
     edit_prompt: str,
-    probe_prompt: Optional[str] = None,
+    task: str = "style",
+    label: Optional[str] = None,
+    max_clips: Optional[int] = None,
     clip_granularity_s: float = 5.0,
-    frames_strategy: str = "first_mid_last",
-    step_ratio: float = 0.5,
-    score_threshold: float = 0.6,
-    top_k: Optional[int] = None,
-    max_windows: Optional[int] = None,
-    # task-specific
-    label: Optional[str] = None,   # required for 'repainting' and 'swap'
-    image: Optional[str] = None,   # required for 'swap'
-    reencode_slices: bool = True   # re-encode slices when cutting to avoid keyframe issues
 ) -> dict:
     """
-    Automatically edits an arbitrarily long video by first *probing* for relevant clips
-    and then applying one of the existing VACE tools to each clip. Finally, all edited
-    clips are concatenated into a single output video.
+    编辑任意长度的长视频（分片 → 逐片云端 VACE 编辑 → 合并）。
 
-    This tool uses `utils/probing.py::find_or_sample_clips` to locate candidate windows
-    based on a probing prompt (handled by a VLM generator). Each retained window is
-    cut out with ffmpeg and processed by one of the registered VACE tools:
-    `repainting`, `swap`, `depth`, `recolor`, `pose`, or `style`.
+    云端 VACE 单次只能处理约 5 秒视频，因此把长视频切成多个 ≤5s 片段，
+    每片用 vace_api 独立编辑，最后用 ffmpeg 拼回完整视频。
+    失败的片段用原始片段顶替，保证输出完整时长。
 
     Args:
-        video (str): Path to the long input video.
-        task (str): Which VACE editing tool to use. One of:
-            {'repainting', 'swap', 'depth', 'recolor', 'pose', 'style'}.
-        edit_prompt (str): Text instruction passed to the selected VACE tool for editing.
-        probe_prompt (Optional[str]): Text instruction for *probing* (clip finding). If None,
-            `edit_prompt` is used for probing as well.
-
-        clip_granularity_s (float, optional): Window length (in seconds) for probing. Default: 5.0.
-        frames_strategy (str, optional): Frame sampling strategy for probing. One of:
-            - "first_mid_last" (default)
-            - "uniform_N"       e.g., "uniform_5"
-            - "every_N_sec"     e.g., "every_2_sec"
-        step_ratio (float, optional): Sliding-window step as a fraction of `clip_granularity_s`
-            (e.g., 0.5 means 50% overlap). Default: 0.5.
-        score_threshold (float, optional): Keep windows whose normalized score >= this threshold
-            (0.0–1.0). Default: 0.6.
-        top_k (Optional[int], optional): If set, keep only the top-K highest-scoring windows.
-        max_windows (Optional[int], optional): Hard cap on the number of windows to evaluate.
-
-        label (Optional[str], optional): Target object class name (e.g., "car", "person").
-            Required for tasks 'repainting' and 'swap'.
-        image (Optional[str], optional): Path to the reference image used by 'swap'.
-            Required when `task == 'swap'`.
-        reencode_slices (bool, optional): If True, re-encode each cut segment to avoid keyframe
-            boundary artifacts; if False, use stream copy (faster but less robust). Default: True.
+        video (str): 长视频路径。
+        edit_prompt (str): 编辑指令，例如 "Turn the skeleton man into a fishman"。
+        task (str, optional): 编辑类型。'style'（风格迁移/重绘）或 'pose'（姿态迁移）。默认 'style'。
+        label (Optional[str], optional): 目标物体类别（当前云端 VACE 未使用，保留兼容）。
+        max_clips (Optional[int], optional): 最大编辑片数。设置后从视频中均匀抽取 max_clips 个
+            5 秒窗口编辑，其余部分保留原片段——适合超长视频控制成本（如 10 分钟视频只编辑 6 片）。
+        clip_granularity_s (float, optional): 每片时长（秒），VACE 上限 5 秒。默认 5.0。
 
     Returns:
-        dict: A result dict aligned with other tools in this server.
-            - 'success' (bool): True if the operation completed successfully, False otherwise.
-            - 'output_path' (str, optional): Path to the merged, edited video when successful.
-            - 'error' (str, optional): Error message when the operation fails.
-
-    Example Usage:
-        long_video_edit(
-            video="/path/to/long_movie.mp4",
-            task="repainting",
-            probe_prompt="a person entering a red car",
-            edit_prompt="turn the car blue, realistic",
-            label="car",
-            clip_granularity_s=5.0,
-            frames_strategy="uniform_5",
-            top_k=5
-        )
+        dict: {'success': bool, 'output_path': str, 'edited_clips': int, 'failed_clips': int}
     """
-    # Use global config/log_dir if available; fall back to sane defaults.
-    _globals = globals()
-    _config = _globals.get("config", {}) or {}
-    _log_dir = _globals.get("log_dir", "logs")
+    api_key = video_editing_config.get("wavespeed_api")
+    _log_dir = "logs"
     os.makedirs(_log_dir, exist_ok=True)
 
-    # Unify save directory and log file naming with existing tools.
-    datetime_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    save_dir = f"/home/zhengyangliang/UniVideo/results/{datetime_now}"
-    os.makedirs(save_dir, exist_ok=True)
-    inference_log = os.path.join(_log_dir, f"vace_inference_long_{datetime_now}.log")
-
     try:
-        # ------------ Validate inputs ------------
         if not os.path.exists(video):
             return {'success': False, 'error': f"Video not found: {video}"}
-
-        task = (task or "").lower().strip()
-        if task not in {'repainting', 'swap', 'depth', 'recolor', 'pose', 'style'}:
-            return {'success': False, 'error': f"Unsupported task: {task}"}
-
         if not edit_prompt:
             return {'success': False, 'error': "Parameter 'edit_prompt' cannot be empty."}
 
-        if task == 'repainting' and not label:
-            return {'success': False, 'error': "Task 'repainting' requires 'label'."}
-        if task == 'swap' and (not label or not image):
-            return {'success': False, 'error': "Task 'swap' requires both 'label' and 'image'."}
+        task = (task or "style").lower().strip()
+        vace_task = "pose" if task in ("pose", "pose_reference") else "inpainting"
 
-        probe_text = probe_prompt or edit_prompt
+        datetime_now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_dir = Path(f"results/long_video_edit/{datetime_now}")
+        save_dir.mkdir(parents=True, exist_ok=True)
+        inference_log = os.path.join(_log_dir, f"vace_inference_long_{datetime_now}.log")
 
-        # ------------ Build a VLM generator (optional external command) ------------
-        vlm_cfg = (_config.get('video_editing', {}) or {}).get('video_long', {}) or {}
-        vlm_cmd_tmpl: Optional[str] = vlm_cfg.get('vlm_cmd')  # e.g., "python utils/vlm_infer.py --images_dir {images_dir} --prompt {prompt}"
+        # ffmpeg 路径：优先 imageio-ffmpeg 自带二进制，找不到再退回 PATH
+        try:
+            from imageio_ffmpeg import get_ffmpeg_exe
+            ffmpeg_bin = get_ffmpeg_exe()
+        except ImportError:
+            ffmpeg_bin = "ffmpeg"
+        logger.info(f"Using ffmpeg: {ffmpeg_bin}")
 
-        def _vlm_subprocess(images: List[Image.Image], prompt: str) -> str:
-            frames_dir = Path(save_dir) / f"vlm_frames_{uuid.uuid4().hex[:6]}"
-            frames_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                for i, im in enumerate(images):
-                    im.save(frames_dir / f"frame_{i:03d}.jpg", quality=90)
-                if vlm_cmd_tmpl:
-                    cmd = vlm_cmd_tmpl.format(images_dir=str(frames_dir), prompt=json.dumps(prompt))
-                    proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                    out = (proc.stdout or "").strip() or (proc.stderr or "").strip()
-                    return out if out else "UNCERTAIN"
-                # Fallback when no VLM configured
-                return "YES"
-            finally:
-                shutil.rmtree(frames_dir, ignore_errors=True)
+        # ------------ 探测视频时长 ------------
+        def _probe_duration(path: str) -> float:
+            r = subprocess.run([ffmpeg_bin, "-i", path],
+                               capture_output=True, text=True)
+            import re
+            m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr)
+            if not m:
+                raise ValueError(f"无法探测视频时长: {path}")
+            return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
 
-        vlm: VLMGenerator = _vlm_subprocess
+        duration = _probe_duration(video)
+        logger.info(f"Video duration: {duration:.1f}s")
 
-        # ------------ Probing phase ------------
-        with open(inference_log, "w") as log_file:
-            log_file.write(
-                f"[LongEdit] Probing with clip_granularity={clip_granularity_s}, "
-                f"frames_strategy={frames_strategy}, step_ratio={step_ratio}, "
-                f"score_threshold={score_threshold}, top_k={top_k}, max_windows={max_windows}\n"
-            )
+        # ------------ 计算编辑窗口 ------------
+        clip_s = min(clip_granularity_s, 5.0)
+        if max_clips:
+            # 抽样：把视频均分 max_clips 段，每段取 clip_s 秒窗口（对齐段中心）
+            seg_len = duration / max_clips
+            windows = []
+            for i in range(max_clips):
+                center = (i + 0.5) * seg_len
+                start = max(0.0, center - clip_s / 2)
+                end = min(duration, center + clip_s / 2)
+                if end - start >= 1.0:
+                    windows.append((start, end))
+        else:
+            # 全覆盖：从头到尾切分
+            windows = [(i * clip_s, min(duration, (i + 1) * clip_s))
+                       for i in range(int(duration // clip_s) + 1)
+                       if min(duration, (i + 1) * clip_s) - i * clip_s >= 1.0]
 
-        results = find_or_sample_clips(
-            video=video,
-            clip_granularity_s=clip_granularity_s,
-            vlm=vlm,
-            prompt=probe_text,
-            mode="probe",
-            frames_strategy=frames_strategy,
-            step_ratio=step_ratio,
-            score_threshold=score_threshold,
-            top_k=top_k,
-            max_windows=max_windows
-        )
+        # 构建时间轴计划：[(start, end, 是否编辑)]，未编辑段用原片剪切，
+        # 保证输出时长 = 原视频完整时长（抽样模式不会丢中间内容）
+        plan = []
+        prev = 0.0
+        for ws, we in windows:
+            if ws > prev + 0.5:
+                plan.append((prev, ws, False))
+            plan.append((ws, we, True))
+            prev = we
+        if duration - prev > 0.5:
+            plan.append((prev, duration, False))
 
-        with open(inference_log, "a") as log_file:
-            compact = [{'time': r['time'], 'score': r.get('score')} for r in results]
-            log_file.write(f"[LongEdit] Probe results: {json.dumps(compact)}\n")
+        logger.info(f"Editing {len(windows)} clips (task={vace_task}, max_clips={max_clips})")
 
-        if not results:
-            with open(inference_log, "a") as log_file:
-                log_file.write("[LongEdit] No relevant clips found.\n")
-            return {
-                'success': False,
-                'error': f"No relevant clips found by probing. See log for details: {inference_log}"
-            }
-
-        # ------------ Helper: cut clips with ffmpeg ------------
-        def _ffmpeg_cut(src_path: str, start: float, end: float) -> str:
-            seg_dir = os.path.join(save_dir, "clips")
-            os.makedirs(seg_dir, exist_ok=True)
-            seg_name = f"clip_{start:.2f}_{end:.2f}.mp4".replace(".", "_")
-            out_path = os.path.join(seg_dir, seg_name)
-            if reencode_slices:
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-                    "-i", src_path,
-                    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                    "-c:a", "aac",
-                    out_path
-                ]
-            else:
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-                    "-i", src_path,
-                    "-c", "copy",
-                    out_path
-                ]
-            with open(inference_log, "a") as log_file:
-                log_file.write("Executing Inference Command:\n" + " ".join(cmd) + "\n\n")
+        def _ffmpeg_cut(start: float, end: float) -> str:
+            out_path = str(save_dir / f"clip_{start:.2f}_{end:.2f}.mp4")
+            cmd = [ffmpeg_bin, "-y", "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
+                   "-i", video, "-map", "0:v:0", "-c:v", "libx264",
+                   "-preset", "fast", "-crf", "18", "-an", out_path]
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             return out_path
 
-        # ------------ Edit each retained clip using the selected VACE tool ------------
+        # ------------ 按时间轴逐段处理 ------------
         edited_paths: List[str] = []
-        for r in results:
-            start_s, end_s = r["time"]
-            clip_path = _ffmpeg_cut(video, float(start_s), float(end_s))
+        failed = 0
+        for i, (start_s, end_s, do_edit) in enumerate(plan):
+            clip_path = _ffmpeg_cut(start_s, end_s)
+            if not do_edit:
+                # 未编辑段：原片剪切，直接入拼接列表
+                edited_paths.append(os.path.abspath(clip_path))
+                continue
 
-            if task == 'repainting':
-                res = repainting(prompt=edit_prompt, video=clip_path, label=label)  # type: ignore
-            elif task == 'swap':
-                res = swap_object_tool(prompt=edit_prompt, video=clip_path, image=image, label=label)  # type: ignore
-            elif task == 'depth':
-                res = depth_modify(prompt=edit_prompt, video=clip_path)  # type: ignore
-            elif task == 'recolor':
-                res = recolor(prompt=edit_prompt, video=clip_path)  # type: ignore
-            elif task == 'pose':
-                res = pose_reference(prompt=edit_prompt, video=clip_path)  # type: ignore
-            elif task == 'style':
-                res = style_transfer(prompt=edit_prompt, video=clip_path)  # type: ignore
-            else:
-                res = {'success': False, 'error': f'Unsupported task: {task}'}
+            first_frame = str(save_dir / f"frame_{i}.png")
+            save_last_frame_decord(clip_path, first_frame)
 
-            with open(inference_log, "a") as log_file:
-                log_file.write(f"[LongEdit] Tool result for [{start_s:.3f},{end_s:.3f}]: {json.dumps(res)}\n")
+            try:
+                res = vace_api(api_key, edit_prompt, image_url=first_frame,
+                               video_url=clip_path, task=vace_task,
+                               duration=max(5, int(round(end_s - start_s))),  # VACE 要求 ≥5s
+                               save_path=str(save_dir / f"edited_{i}.mp4"))
+                with open(inference_log, "a") as log_file:
+                    log_file.write(f"[{start_s:.1f}-{end_s:.1f}s] {json.dumps(res, ensure_ascii=False)}\n")
+                if isinstance(res, dict) and res.get("success") and res.get("output_path") \
+                        and os.path.exists(res["output_path"]):
+                    edited_paths.append(os.path.abspath(res["output_path"]))
+                else:
+                    # 编辑失败：用原片顶替，保证完整性
+                    logger.warning(f"Clip {i} edit failed, using original: {res}")
+                    edited_paths.append(os.path.abspath(clip_path))
+                    failed += 1
+            except Exception as e:
+                logger.error(f"Clip {i} edit error: {e}")
+                edited_paths.append(os.path.abspath(clip_path))
+                failed += 1
 
-            if isinstance(res, dict) and res.get('success') and res.get('output_path'):
-                # Normalize to absolute path for ffmpeg concat robustness
-                edited_paths.append(os.path.abspath(res['output_path']))
-
-        if not edited_paths:
-            with open(inference_log, "a") as log_file:
-                log_file.write("[LongEdit] No segments were successfully edited.\n")
-            return {
-                'success': False,
-                'error': f"No segments were successfully edited. See log for details: {inference_log}"
-            }
-
-        # ------------ Concatenate edited segments ------------
-        concat_list = os.path.join(save_dir, "concat_list.txt")
-        with open(concat_list, "w") as f:
+        # ------------ 合并 ------------
+        concat_list = save_dir / "concat_list.txt"
+        with open(concat_list, "w", encoding="utf-8") as f:
             for p in edited_paths:
-                f.write(f"file '{p}'\n")
+                f.write(f"file '{p.replace(chr(92), chr(92) * 2)}'\n")
 
         time_tag = datetime.now().strftime("%m%d%H%M%S")
-        output_path_path = os.path.join(save_dir, f"{time_tag}_output.mp4")
-
-        # Try stream-copy concat first
-        concat_copy_cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", concat_list,
-            "-c", "copy",
-            output_path_path
-        ]
-        with open(inference_log, "a") as log_file:
-            log_file.write("Executing Inference Command:\n" + " ".join(concat_copy_cmd) + "\n\n")
+        output_path = str(save_dir / f"{time_tag}_output.mp4")
 
         try:
-            subprocess.run(concat_copy_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # Fallback: re-encode concat if codecs/parameters mismatch
-            concat_reencode_cmd = [
-                "ffmpeg", "-y",
-                "-f", "concat", "-safe", "0",
-                "-i", concat_list,
-                "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-                "-c:a", "aac",
-                output_path_path
-            ]
-            with open(inference_log, "a") as log_file:
-                log_file.write("Executing Inference Command:\n" + " ".join(concat_reencode_cmd) + "\n\n")
-            subprocess.run(concat_reencode_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run([ffmpeg_bin, "-y", "-f", "concat", "-safe", "0",
+                            "-i", str(concat_list), "-c", "copy", output_path],
+                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            subprocess.run([ffmpeg_bin, "-y", "-f", "concat", "-safe", "0",
+                            "-i", str(concat_list), "-c:v", "libx264",
+                            "-preset", "fast", "-crf", "18", "-an", output_path],
+                           check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # ------------ Success (match existing return style) ------------
         return {
             'success': True,
-            'output_path': output_path_path
+            'output_path': output_path,
+            'edited_clips': len(windows) - failed,
+            'failed_clips': failed,
         }
 
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        error_message = f"Inference failed. See log for details: {inference_log}. Error: {str(e)}"
-        return {
-            'success': False,
-            'error': error_message
-        }
+        return {'success': False, 'error': f"Long video edit failed: {e}"}
     except Exception as e:
-        return {'success': False, 'error': f"An unexpected error occurred during inference: {str(e)}"}
+        return {'success': False, 'error': f"An unexpected error occurred: {str(e)}"}
 
 
 
