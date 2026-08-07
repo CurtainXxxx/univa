@@ -277,7 +277,7 @@
         <ul>
           <li>vision2text_gen ✅<small>视频理解</small></li>
           <li>multimodal_query ✅<small>多模态问答</small></li>
-          <li>lvu QA ✅<small>77% 准确率</small></li>
+          <li>lvu QA ✅<small>74.8% 准确率（论文 76%）</small></li>
         </ul>
       </div>
       <div class="status-card partial">
@@ -395,6 +395,8 @@
         <p><span class="fix">修复：</span>AI 规划时编造了不存在的图片路径——改为只用你真实提供的图，生成的目录名也做了安全处理。已完整验证：3 个 5s 片段 → ffmpeg 无损拼接 → 15 秒成片（363 帧，864×496）。<span class="fix">补齐：</span>系统无 ffmpeg，装 imageio-ffmpeg 自带二进制解决。</p></div>
       <div class="bug"><h3>⑦ 问答任务偶发崩溃</h3>
         <p><span class="fix">修复：</span>规划失败时不再报错崩溃，而是返回明确提示信息。</p></div>
+      <div class="bug"><h3>⑧ lvu 评测口径修正</h3>
+        <p><span class="fix">发现：</span>只测第 1 问 + 32 帧只有 60%；改成每条视频全部 QA（选择题字母匹配 + 简答题 LLM judge）+ 64 帧后达到 74.8%，与论文 76% 基本一致。评测口径决定结论。</p></div>
     </div>
   </section>
 
@@ -481,7 +483,7 @@
       <div class="step-row"><span class="no">1</span><span class="txt">搭建评测框架：metrics.py 三指标 + runner.py 执行器</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">2</span><span class="txt">跑通 lt2v / it2v 实验脚本（Agent 链路）</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">3</span><span class="txt">修复 entity2video 故事板幻觉 + 目录名，验证完整版</span><span class="st done">已完成</span></div>
-      <div class="step-row"><span class="no">4</span><span class="txt">lvu 直连评测（direct 模式，绕开 PlanAgent 规划不稳）</span><span class="st doing">进行中</span></div>
+      <div class="step-row"><span class="no">4</span><span class="txt">lvu 直连评测（direct 模式，绕开 PlanAgent 规划不稳）</span><span class="st done">已完成</span></div>
       <div class="step-row"><span class="no">5</span><span class="txt">实现 long_video_edit 分片编辑合并，打通 lve/v2v 长视频</span><span class="st todo">待办</span></div>
       <div class="step-row"><span class="no">6</span><span class="txt">全量跑 57 条任务，汇总四类指标</span><span class="st todo">待办</span></div>
       <div class="step-row"><span class="no">7</span><span class="txt">实现 Single-Agent 对照 + Memory 消融</span><span class="st todo">待办</span></div>

@@ -86,18 +86,58 @@ def run_direct(task: str, item: dict, api_key: str) -> dict:
         src = str(BENCH_ROOT / (src[0] if not src[0].startswith("D:") else src[0]))
         return {"success": False, "message": "direct 模式需分片，请用 agent 模式"}
     if task == "lvu":
-        from utils.query_llm import multimodal_query
+        from utils.query_llm import multimodal_query, query_openai, llm_config
         video = str(BENCH_ROOT / f"Videos/{item['videoID']}.mp4")
-        q = item["qas"][0]
-        opts = " ".join(q["options"])
-        prompt = (f"Answer the question based on the video. Question: {q['question']} "
-                  f"Options: {opts} Reply with just the letter.")
-        answer = multimodal_query(prompt, video_path=video, video_frames_to_extract=32)
-        correct = q.get("answer", "")
+        qa_results = []
+        for q in item["qas"]:
+            opts = q.get("options") or []
+            is_mcq = bool(opts)
+            if is_mcq:
+                prompt = (f"Answer the question based on the video. Question: {q['question']} "
+                          f"Options: {' '.join(opts)} Reply with just the letter.")
+            else:
+                prompt = (f"Answer the question based on the video. "
+                          f"Question: {q['question']}")
+            answer = multimodal_query(prompt, video_path=video, video_frames_to_extract=64)
+            correct = q.get("answer", "")
+
+            if is_mcq:
+                # 选择题：字母精确匹配
+                ok = bool(answer and str(answer).strip().upper() == str(correct).upper())
+            else:
+                # 简答题：纯文本 LLM judge（不带图，判断是否抓住核心点）
+                judge_prompt = (
+                    f"判断下面的模型回答是否准确抓住了参考回答的核心要点。"
+                    f"只需输出 YES 或 NO。\n\n"
+                    f"问题: {q['question']}\n"
+                    f"参考回答: {correct[:600]}\n"
+                    f"模型回答: {str(answer)[:600]}\n"
+                )
+                judge_resp = query_openai(
+                    api_key=llm_config.get('openai_api_key', None),
+                    model=llm_config.get('model', 'gpt-5-2025-08-07'),
+                    messages=[{"role": "user", "content": judge_prompt}],
+                    max_completion_tokens=32,
+                    base_url=llm_config.get('base_url', 'https://api.openai.com/v1')
+                )
+                ok = "YES" in str(judge_resp.get("content", "")).upper()
+
+            qa_results.append({
+                "question": q["question"][:120],
+                "type": "mcq" if is_mcq else "open",
+                "options": opts,
+                "answer": str(answer)[:50],
+                "correct": correct[:120],
+                "ok": ok,
+            })
+        n_ok = sum(1 for r in qa_results if r["ok"])
+        accuracy = n_ok / len(qa_results)
         return {
-            "success": bool(answer and str(answer).strip().upper() == str(correct).upper()),
-            "answer": str(answer)[:50],
-            "correct": correct,
+            "success": accuracy >= 0.5,  # 跑完即算完成，>50% 算达标
+            "accuracy": round(accuracy, 4),
+            "n_ok": n_ok,
+            "n_total": len(qa_results),
+            "qa_results": qa_results,
             "output_path": None,
         }
     return {"success": False, "message": f"direct 不支持 {task}"}
