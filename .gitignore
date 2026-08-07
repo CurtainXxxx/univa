@@ -70,3 +70,6 @@ canton_tower_*.jpg
 # 评测冒烟产物
 /eval/tmp/
 /eval/outputs/
+
+# 运行产生的临时文件
+/univa/eval/

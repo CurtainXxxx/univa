@@ -6,9 +6,9 @@ image_gen:
 
 video_editing:
   model_path: "/mnt/data/zhengyangliang/Wan2.1-VACE-1.3B"
-  style_transfer: "runway"
+  style_transfer: "vace_api"
   pose_reference: "vace_api"
-  repainting: "runway"
+  repainting: "vace_api"
   wavespeed_api: ""
 
 video_gen:

@@ -65,7 +65,7 @@ def vision2text_gen(prompt: str, multimodal_path: str, type: str) -> dict:
     """
     try:
         if type == "video":
-            content = multimodal_query(prompt, video_path=multimodal_path)
+            content = multimodal_query(prompt, video_path=multimodal_path, video_frames_to_extract=128)
         elif type == "image":
             content = multimodal_query(prompt, image_path=multimodal_path)
         else:

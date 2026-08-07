@@ -14,6 +14,7 @@ from PIL import Image
 
 from utils.probing import find_or_sample_clips, VLMGenerator
 from utils.wavespeed_api import runway_video_editing, vace_api
+from utils.video_process import save_last_frame_decord
 
 from mcp_tools.base import ToolResponse, setup_logger
 
@@ -706,6 +707,21 @@ def style_transfer(
                 'success': False,
                 'error': f"Inference error: {str(e)}"
             }
+    elif model in ("vace_api", "vace-wavespeed"):
+        # 云端 VACE 风格迁移（走 Wavespeed，已验证可用）
+        tmp_dir = Path("eval/tmp/vace")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        first_frame = save_last_frame_decord(video, str(tmp_dir / "first_frame.png"))
+        res = vace_api(
+            api_key=api_key,
+            prompt=prompt,
+            image_url=first_frame,   # VACE 强制需要参考图
+            video_url=video,
+            task="inpainting",
+            duration=5,
+            save_path=str(tmp_dir / "style_transfer.mp4")
+        )
+        return res
     else:
         res = runway_video_editing(api_key, prompt, video)
 
