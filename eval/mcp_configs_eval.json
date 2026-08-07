@@ -2,32 +2,57 @@
   "mcpServers": {
     "video_gen": {
       "command": "python",
-      "args": ["-m", "mcp_tools.video_gen"],
-      "env": {"PYTHONPATH": "D:\\univa\\univa"},
+      "args": [
+        "-m",
+        "mcp_tools.video_gen"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
       "auto_confirm": []
     },
     "image_gen": {
       "command": "python",
-      "args": ["-m", "mcp_tools.image_gen"],
-      "env": {"PYTHONPATH": "D:\\univa\\univa"},
+      "args": [
+        "-m",
+        "mcp_tools.image_gen"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
       "auto_confirm": []
     },
     "audio_gen": {
       "command": "python",
-      "args": ["-m", "mcp_tools.audio_gen"],
-      "env": {"PYTHONPATH": "D:\\univa\\univa"},
+      "args": [
+        "-m",
+        "mcp_tools.audio_gen"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
       "auto_confirm": []
     },
     "video_understanding": {
       "command": "python",
-      "args": ["-m", "mcp_tools.video_understanding"],
-      "env": {"PYTHONPATH": "D:\\univa\\univa"},
+      "args": [
+        "-m",
+        "mcp_tools.video_understanding"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
       "auto_confirm": []
     },
     "video_editing": {
       "command": "python",
-      "args": ["-m", "mcp_tools.video_editing"],
-      "env": {"PYTHONPATH": "D:\\univa\\univa"},
+      "args": [
+        "-m",
+        "mcp_tools.video_editing"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\univa\\univa"
+      },
       "auto_confirm": []
     }
   }
