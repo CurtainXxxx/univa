@@ -404,7 +404,7 @@
       <div class="bug"><h3>⑪ SingleAgent 对照实现</h3>
         <p><span class="fix">实现：</span>结论2 对照——SingleAgent（一个模型同时规划+执行，一次对话连环调工具）vs Plan-Act（双 Agent 分工）。runner 新增 --mode single，与 agent 模式共用同一 MCP 连接与 session 记忆，只差分工方式。</p></div>
       <div class="bug"><h3>⑫ 环境统一 + 成本护栏</h3>
-        <p><span class="fix">环境：</span>项目真实环境是 venv（agno 2.7.2），之前误用 base python（agno 2.8.7 把 system 映射成 developer role 导致 DeepSeek 报错）。评测统一用 venv + PATH 前缀。<span class="fix">护栏：</span>SingleAgent 加 tool_call_limit=10 + 单轮 600s 超时 + "禁止重复生成"指令；runner 执行前写 pending 标记防中断丢结果。</p></div>
+        <p><span class="fix">环境：</span>项目真实环境是 venv（agno 2.7.2），之前误用 base python（agno 2.8.7 把 system 映射成 developer role 导致 DeepSeek 报错）。评测统一用 venv + PATH 前缀。<span class="fix">护栏：</span>SingleAgent 加 tool_call_limit=10 + 单轮 600s 超时 + "禁止重复生成"指令；runner 执行前写 pending 标记防中断丢结果。<span class="fix">实锤：</span>SingleAgent 首次测试 Wavespeed 扣了 2 笔（模型把同一生成任务提交了 2 次，护栏前无限制）。</p></div>
     </div>
   </section>
 
