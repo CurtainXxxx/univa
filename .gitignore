@@ -73,3 +73,6 @@ canton_tower_*.jpg
 
 # 运行产生的临时文件
 /univa/eval/
+# entity2video 运行产物
+/univa/infer/
+/univa/concat_list.txt

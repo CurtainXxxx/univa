@@ -72,6 +72,15 @@ logger.info(f"Loaded video_gen_config: {video_gen_config}")
 mcp = FastMCP("Video_Generation_Server")
 
 
+def _safe_dirname(text: str, max_len: int = 30) -> str:
+    """把文本转成安全的目录名（去 Windows 非法字符）。"""
+    import re
+    # 去掉 Windows 非法字符: \ / : * ? " < > |
+    cleaned = re.sub(r'[\\/:*?"<>|]', '_', text)
+    cleaned = cleaned.replace('\n', ' ').strip()
+    return cleaned[:max_len].replace(' ', '_')
+
+
 # =============================================================================
 # 工具1: text2video_gen — 文本 → 视频（最常用）
 # =============================================================================
@@ -95,7 +104,7 @@ async def text2video_gen(prompt: str) -> Dict:
 
     if model == "seedance":
         api_key = video_gen_config.get("wavespeed_api")
-        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{prompt[:30].replace(' ', '_')}"
+        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{_safe_dirname(prompt)}"
         os.makedirs(save_dir, exist_ok=True)
         _time = datetime.now().strftime("%m%d%H%M%S")
         save_path = f"{save_dir}/{_time}.mp4"
@@ -130,7 +139,7 @@ async def storyvideo_gen(prompt: str) -> ToolResponse:
     """
     model = video_gen_config.get("text_to_video")
     if model == "seedance":
-        save_dir = f"infer/v2v/{datetime.now().strftime('%Y%m%d%H%M%S')}_{prompt[:30].replace(' ', '_')}"
+        save_dir = f"infer/v2v/{datetime.now().strftime('%Y%m%d%H%M%S')}_{_safe_dirname(prompt)}"
         os.makedirs(save_dir, exist_ok=True)
 
         # ---- 步骤1：LLM 生成故事板 ----
@@ -241,7 +250,7 @@ async def entity2video(prompt: str, images: List[str]) -> ToolResponse:
     """
     model = video_gen_config.get("text_to_video")
     if model == "seedance":
-        save_dir = f"infer/v2v/{datetime.now().strftime('%Y%m%d%H%M%S')}_{prompt[:30].replace(' ', '_')}"
+        save_dir = f"infer/v2v/{datetime.now().strftime('%Y%m%d%H%M%S')}_{_safe_dirname(prompt)}"
         os.makedirs(save_dir, exist_ok=True)
 
         prompt = f"{prompt}\nsource images path: {str(images)}"
@@ -250,12 +259,19 @@ async def entity2video(prompt: str, images: List[str]) -> ToolResponse:
 
         style = storyboard.get("style")
 
-        # 直接用用户提供的图片作为角色参考图
-        characters = storyboard.get("characters")
+        # 直接用用户提供的图片作为角色参考图。
+        # 注意：不信任故事板里的 path（LLM 可能幻觉出不存在的路径），
+        # 而是用调用方传入的 images（真实存在的文件）。
+        characters = storyboard.get("characters") or []
+        characters_image_path = dict()
         for idx, character in enumerate(characters):
             char_id = f"char_{idx+1}"
-            character_path = character.get("path")
-            characters_image_path[char_id] = character_path
+            if idx < len(images):
+                characters_image_path[char_id] = images[idx]
+            else:
+                # 故事板角色多于用户提供的图时，跳过该角色
+                logger.warning(f"角色 {char_id} 无对应输入图，跳过")
+                characters_image_path[char_id] = None
 
         shots = storyboard.get("shots")
         shots_image_path = dict()
@@ -274,10 +290,15 @@ async def entity2video(prompt: str, images: List[str]) -> ToolResponse:
 
             keyframe_prompt = f"{setting_description} {plot_correspondence} {static_shot_description} {distance}, {angle}, {lens}"
             api_key = image_gen_config.get("wavespeed_api")
-            if len(onstage_characters_image_path_list) == 0:
+            # 过滤掉无效的角色图路径（None 或文件不存在）
+            valid_char_images = [
+                p for p in onstage_characters_image_path_list
+                if p and os.path.exists(p)
+            ]
+            if len(valid_char_images) == 0:
                 image_url = text_to_image_generate(api_key, keyframe_prompt)
             else:
-                image_url = image_to_image_generate(api_key, keyframe_prompt, onstage_characters_image_path_list)
+                image_url = image_to_image_generate(api_key, keyframe_prompt, valid_char_images)
             time = datetime.now().strftime("%m%d%H%M%S")
             image_save_path = f"{save_dir}/{time}_{shot_id}.jpg"
             shots_image_path[shot_id] = image_save_path
@@ -339,7 +360,7 @@ async def image2video_gen(prompt: str, image_path: str) -> Dict:
 
     if model == "seedance":
         api_key = video_gen_config.get("wavespeed_api")
-        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{prompt[:30].replace(' ', '_')}"
+        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{_safe_dirname(prompt)}"
         os.makedirs(save_dir, exist_ok=True)
         _time = datetime.now().strftime("%m%d%H%M%S")
         save_path = f"{save_dir}/{_time}.mp4"
@@ -403,7 +424,7 @@ async def frame2frame_video_gen(prompt: str, first_frame_path: str, last_frame_p
 
     if model == "wan_api":
         api_key = video_gen_config.get("wavespeed_api")
-        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{prompt[:30].replace(' ', '_')}"
+        save_dir = f"results/{datetime.now().strftime('%Y%m%d%H%M%S')}_{_safe_dirname(prompt)}"
         os.makedirs(save_dir, exist_ok=True)
         _time = datetime.now().strftime("%m%d%H%M%S")
         save_path = f"{save_dir}/{_time}.mp4"

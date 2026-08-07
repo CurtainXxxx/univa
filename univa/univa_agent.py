@@ -348,6 +348,20 @@ class PlanActSystem:
 
     async def execute_task(self, session_id, user_request: str) -> Dict[str, Any]:
         execution_plan = await self.plan_agent.generate_plan(session_id, user_request)
+
+        # 防御：PlanAgent 解析失败时返回的是字符串而非 dict
+        if not isinstance(execution_plan, dict) or 'execution_plan' not in execution_plan:
+            return {
+                "plan": execution_plan,
+                "execution": {
+                    1: {
+                        "success": False,
+                        "message": f"PlanAgent 未能生成有效计划: {str(execution_plan)[:200]}",
+                        "output_path": None,
+                    }
+                }
+            }
+
         results = await self.act_agent.execute_plan(user_request, execution_plan)
         self.plan_agent.inject_execution_results(session_id, execution_plan, results)
 
