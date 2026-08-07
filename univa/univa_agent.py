@@ -14,6 +14,11 @@ from agno.agent import Agent
 from agno.tools.mcp import MCPTools, MultiMCPTools
 from agno.db.sqlite import SqliteDb
 
+# agno 2.8 默认把 system role 映射为 developer（为 GPT-5 设计），
+# DeepSeek/DashScope 等 OpenAI 兼容 API 不认 developer role → 改回 system
+from agno.models.openai.chat import OpenAIChat
+OpenAIChat.default_role_map["system"] = "system"
+
 
 def _init_env():
     base = Path(__file__).resolve().parents[1]
@@ -346,6 +351,7 @@ SINGLE_ACT_INSTRUCTIONS = """你是视频任务的规划者兼执行者（Single
 
 必须遵守：
 - 每个 step 只做一件事，只调用一个工具；
+- 同一个工具最多调用一次，禁止重复生成/重复提交（视频生成很贵）；
 - output_path / output 必须填工具真实返回的文件路径，禁止编造；
 - 某步失败时如实填 status=failed，并继续尝试剩余步骤（不要整体放弃）；
 - 最终输出必须且只能是更新后的计划 JSON，不要附加解释文字。"""
@@ -358,8 +364,14 @@ class SingleAgent:
     相同模型、相同工具集、相同 session 记忆，仅差异在"分工"。
     """
 
-    def __init__(self, mcp_tools: MultiMCPTools, db=None):
+    def __init__(self, mcp_tools: MultiMCPTools, db=None,
+                 max_run_seconds: int = 600, tool_call_limit: int = 10):
+        """Args:
+            max_run_seconds: 单轮总超时（秒），防止模型循环调用烧钱。
+            tool_call_limit: 单轮工具调用上限（一次生成约 $0.3-0.5，控制成本）。
+        """
         self.mcp_tools = mcp_tools
+        self.max_run_seconds = max_run_seconds
 
         plan_prompt = load_prompt("plan")
         full_instructions = f"{plan_prompt}\n\n{SINGLE_ACT_INSTRUCTIONS}"
@@ -381,7 +393,7 @@ class SingleAgent:
             ),
             instructions=full_instructions,
             tools=[mcp_tools],
-            tool_call_limit=50,  # 关键：一次对话内规划+连环调工具
+            tool_call_limit=tool_call_limit,  # 关键：一次对话内规划+连环调工具（上限控制成本）
             db=db,
             add_history_to_context=True,
             num_history_messages=10,
@@ -396,10 +408,14 @@ class SingleAgent:
             其中 execution[step_num] = {success, output_path, message}，
             便于 runner 用同一套解析逻辑。
         """
-        response = await self.agent.arun(
-            input=user_request,
-            stream=False,
-            session_id=session_id,
+        # 成本护栏：单轮总超时，防止模型循环调用工具/重复生成
+        response = await asyncio.wait_for(
+            self.agent.arun(
+                input=user_request,
+                stream=False,
+                session_id=session_id,
+            ),
+            timeout=self.max_run_seconds,
         )
 
         plan = extract_plan_from_content(response.content)

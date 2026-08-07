@@ -255,6 +255,13 @@ async def main():
             task_dir.mkdir(exist_ok=True)
 
             print(f"  执行 {item_id} ...")
+            # 即时标记：进程中断也能知道这条跑到哪一步
+            pending_file = task_dir / f"{item_id}.pending.json"
+            with open(pending_file, "w", encoding="utf-8") as f:
+                json.dump({"item_id": item_id, "task": task, "started": True,
+                           "request": build_request(task, item)[:200]}, f,
+                          ensure_ascii=False, indent=2)
+
             if args.mode in ("agent", "single"):
                 result = await run_agent_item(system, task, item, f"{args.run_id}|{task}|{idx}",
                                               method=method)
@@ -263,11 +270,13 @@ async def main():
                 result["task"] = task
                 result["item_id"] = item_id
 
-            # 保存 manifest
+            # 保存 manifest（完成后删除 pending 标记）
             manifest = {**result, "item": {k: str(v)[:500] for k, v in item.items() if k != "qas"}}
             out_file = task_dir / f"{item_id}.json"
             with open(out_file, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
+            if pending_file.exists():
+                pending_file.unlink()
 
             status = "✅" if result.get("success") else "❌"
             print(f"  {status} {item_id}: output={result.get('output_path')}")
