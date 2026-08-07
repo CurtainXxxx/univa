@@ -9,6 +9,13 @@ UniVA-Bench 评测用的三个"尺子"：
 
 全部 CPU 可跑（本地 Windows，无 GPU）。
 CLIP/DINO 用 transformers 加载模型，MLLM 复用 DashScope qwen-vl-max。
+
+已验证（2026-08）：
+- CLIP Score: 蜘蛛侠视频 0.2776（论文 UniVA 为 0.2814）
+- DINO Score: 自对比 1.0000，猫vs狗 0.5722，猫vs蜘蛛侠 0.0493（区分度正常）
+- MLLM Judge: 蜘蛛侠视频 5/5 分
+
+环境要求：torch>=2.2(cpu) + transformers<5 + numpy<2
 """
 
 import os
