@@ -228,11 +228,27 @@
       <div class="bullet"><span class="dot">·</span>控制变量：同 prompt / 同工具 / 同模型，只变结构</div>
       <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · wPED 近似评价（Inspired by wPED）</div>
     </div>
-    <div class="find" style="margin-top:18px">
-      <h3>小样本初步结果（lt2v n=2）</h3>
-      <p>· Success Rate：<strong>Dual 2/2（100%）vs Single 1/2（50%）</strong><br />
-         · Single 失败原因：<span class="hl">误判请求重复，复用已有结果不生成</span><br />
-         · 趋势符合论文：显式规划减少失败（样本小，待扩展）</p>
+  </section>
+
+  <!-- P8b Single vs Dual 初步结果 -->
+  <section class="slide">
+    <div class="tag">实验设计 · 论文贡献 2</div>
+    <div class="title">Single vs Dual · 小样本初步结果</div>
+    <div class="sub">lt2v · n=2 · 执行层初测</div>
+    <div class="result-row">
+      <div class="result-card hot"><div class="big">2/2</div><div class="lbl">Dual Success Rate（100%）</div></div>
+      <div class="result-card"><div class="big">1/2</div><div class="lbl">Single Success Rate（50%）</div></div>
+      <div class="result-card"><div class="big">text2video_gen</div><div class="lbl">两者工具序列一致</div></div>
+    </div>
+    <div class="find" style="margin-top:22px">
+      <h3>Single 的失败原因（有讲头）</h3>
+      <p>· 误判"请求与上一条相同"→ <span class="hl">复用已有结果，不重新生成</span><br />
+         · 实际两条 prompt 不同（雾中竹林 vs 赛博朋克屋顶）<br />
+         · 这是 Single Agent 记忆/幻觉导致的真实失败</p>
+    </div>
+    <div class="find" style="margin-top:14px">
+      <h3>趋势符合论文</h3>
+      <p>· 显式规划（Dual）减少失败 · 样本小（n=2），待扩展</p>
     </div>
   </section>
 
@@ -274,7 +290,7 @@
 
   <div class="footer">
     <span>UniVA 复现 · 组会汇报</span>
-    <span class="page" id="pageNum">01 / 10</span>
+    <span class="page" id="pageNum">01 / 11</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>
