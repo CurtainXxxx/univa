@@ -203,6 +203,30 @@
     </div>
   </section>
 
+  <!-- P8 Planner 层分析 -->
+  <section class="slide">
+    <div class="tag">机制验证 · 零成本</div>
+    <div class="title">Planner 层分析：显式规划的收益依赖工具约束</div>
+    <div class="sub">为降成本，先在规划层验证——不调生成 API，只比较两种架构输出的工具选择</div>
+    <table class="ds-table" style="font-size:17px;">
+      <tr><th></th><th>Plan-Act</th><th>Single</th></tr>
+      <tr><td>计划有效率（n=18）</td><td class="st">18/18</td><td class="st">18/18</td></tr>
+      <tr><td>工具选择正确（n=18）</td><td class="st">12/18</td><td class="st">13/18</td></tr>
+    </table>
+    <div class="find" style="margin-top:18px">
+      <h3>发现 1：Tool Description 很重要</h3>
+      <p>long_video_edit 已注册进 MCP，但 plan.txt 无描述 → Planner 不知道它存在（lve 0/3 全挂）</p>
+    </div>
+    <div class="find" style="margin-top:12px">
+      <h3>发现 2：约束提升 Planner</h3>
+      <p>Plan-Act 工具选对：未约束 3/6 → 加约束 5/6 → 全量 12/18<br />Planner 能力 = LLM + 工具空间定义 + prompt 约束</p>
+    </div>
+    <div class="find" style="margin-top:12px">
+      <h3>发现 3：与执行层结合</h3>
+      <p>规划层 Single 略优（13/18），但执行层 Dual 减少实际失败（2/2 vs 1/2）<br /><span class="hl">→ Planner 价值可能体现在复杂执行，不仅是单步工具选择</span></p>
+    </div>
+  </section>
+
   <!-- P8 Single vs Dual 实验设计 -->
   <section class="slide">
     <div class="tag">实验设计 · 论文贡献 2</div>
@@ -290,7 +314,7 @@
 
   <div class="footer">
     <span>UniVA 复现 · 组会汇报</span>
-    <span class="page" id="pageNum">01 / 11</span>
+    <span class="page" id="pageNum">01 / 12</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>
