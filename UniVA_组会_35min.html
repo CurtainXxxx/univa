@@ -138,7 +138,7 @@
   <!-- P4 代码架构理解 -->
   <section class="slide">
     <div class="tag">CODE UNDERSTANDING</div>
-    <div class="title">已定位完整调用链</div>
+    <div class="title">已定位主要调用链</div>
     <div class="sub">不是"打开了哪些文件"，而是理解了整体结构</div>
     <div class="arch">
       <div class="node">Runner（评测执行器）</div>
@@ -163,7 +163,7 @@
     <div class="cards">
       <div class="card"><h3>Generation</h3><p>lt2v / it2v / entity2video 全通<br />多图故事 <strong>15s 成片</strong></p></div>
       <div class="card"><h3>Understanding</h3><p>lvu 全量评测<br /><strong>74.8%</strong>（103 题全 QA）</p></div>
-      <div class="card"><h3>Editing</h3><p>长视频分片→编辑→合并<br /><strong>61s 成片</strong>（样本少）</p></div>
+      <div class="card"><h3>Editing</h3><p>长视频分片→编辑→合并<br /><strong>链路跑通</strong><span style="font-size:14px;color:var(--muted)">（61s 成片）</span></p></div>
     </div>
   </section>
 
@@ -187,21 +187,19 @@
   <!-- P7 复现中的问题与发现 -->
   <section class="slide">
     <div class="tag">FINDINGS</div>
-    <div class="title">复现过程中发现的问题</div>
-    <div class="sub">三个问题，指向 Agent 机制的本质</div>
+    <div class="title">Agent 系统复现中的关键影响因素</div>
+    <div class="sub">三个因素，决定 Agent 能不能做好</div>
     <div class="find">
-      <h3>Tool description 影响 Planner</h3>
-      <p>long_video_edit 无法被规划 → 工具注册进 MCP 但未同步进 plan.txt。
-      <span class="hl">启示：Agent 能力依赖工具描述质量，不只是 LLM。</span></p>
+      <h3>Tool Description 影响 Planner</h3>
+      <p>· 工具注册 ≠ Agent 可见<br />· Tool specification 直接决定规划质量</p>
     </div>
     <div class="find">
-      <h3>API 成本问题</h3>
-      <p>视频生成单价高（~$0.3-0.5/次）。<span class="hl">措施：小样本验证机制，不做全量烧钱。</span></p>
+      <h3>Evaluation Protocol 影响结果</h3>
+      <p>· lvu 曾偏低 → 全 QA + 64 帧后 74.8%<br />· 评测需严格对齐论文，否则数字不可比</p>
     </div>
     <div class="find">
-      <h3>评测口径问题</h3>
-      <p>lvu 结果曾偏低 → 根因是只测第 1 问、帧数不足。
-      <span class="hl">全 QA + 64 帧后到 74.8%。启示：评测需严格对齐论文。</span></p>
+      <h3>API Cost 限制实验规模</h3>
+      <p>· 生成单价 ~$0.3-0.5/次<br />· 优先小样本验证机制，再做全量</p>
     </div>
   </section>
 
@@ -228,7 +226,8 @@
     </div>
     <div class="bullets" style="margin-top:18px">
       <div class="bullet"><span class="dot">·</span>控制变量：同 prompt / 同工具 / 同模型，只变结构</div>
-      <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · 简化 wPED</div>
+      <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · wPED 近似评价</div>
+      <div class="bullet"><span class="dot">·</span>Inspired by wPED（参考计划受限，用标准工具链近似）</div>
     </div>
   </section>
 
@@ -261,8 +260,8 @@
     <div class="tag">NEXT STEPS</div>
     <div class="title">接下来做三件事</div>
     <div class="cards">
-      <div class="card"><div class="num">1</div><h3>Single vs Dual 小样本</h3><p>执行层 Success Rate / Tool Sequence / 简化 wPED</p></div>
-      <div class="card"><div class="num">2</div><h3>Memory 消融</h3><p>5 种记忆组合 × 量化指标</p></div>
+      <div class="card"><div class="num">1</div><h3>Single vs Dual 小样本</h3><p>执行层 Success Rate / Tool Sequence / wPED 近似</p></div>
+      <div class="card"><div class="num">2</div><h3>Memory 消融</h3><p>Full 与去除单模块的消融对比</p></div>
       <div class="card"><div class="num">3</div><h3>Segmentation</h3><p>AutoDL 租 3090 跑 Sa2VA</p></div>
     </div>
     <div style="margin-top:28px; text-align:center; color:var(--muted); font-size:16px;">谢谢 · 欢迎讨论</div>
