@@ -3,135 +3,94 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>UniVA 复现工作 · 35 分钟组会</title>
+<title>UniVA Reproduction · 组会汇报</title>
 <style>
   :root {
-    --ink: #00264F;
-    --body: #43515F;
-    --muted: #7B8A9A;
-    --blue: #3D8DFF;
-    --sky: #6DCBF4;
-    --light: #D0EDFA;
-    --green: #47E2C2;
-    --line: #DCE7F2;
-    --card: #F4F9FD;
+    --ink: #1A1A2E;        /* 深黑正文 */
+    --body: #33334D;
+    --muted: #6E6E85;
+    --blue: #2E5BFF;       /* 唯一强调色 */
+    --light: #E9EEFF;
+    --line: #D8DCE8;
+    --card: #F7F8FC;
+    --green: #2EBD85;
     --font: "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    background: #E9EEF4;
+    background: #EDEFF4;
     font-family: var(--font);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 24px;
-    color: var(--body);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px; color: var(--body);
   }
   .stage {
-    width: 1280px; height: 720px;
-    background: #FFFFFF; position: relative; overflow: hidden;
-    border-radius: 10px; box-shadow: 0 28px 70px rgba(0,38,79,.18); flex: none;
+    width: 1280px; height: 720px; background: #FFF; position: relative;
+    overflow: hidden; border-radius: 10px; box-shadow: 0 28px 70px rgba(0,0,0,.14); flex: none;
   }
-  .slide {
-    position: absolute; inset: 0; padding: 48px 72px 56px;
-    opacity: 0; pointer-events: none; transition: opacity .22s ease; overflow-y: auto;
-  }
+  .slide { position: absolute; inset: 0; padding: 54px 80px 60px;
+    opacity: 0; pointer-events: none; transition: opacity .22s ease; overflow-y: auto; }
   .slide.active { opacity: 1; pointer-events: auto; }
-  .eyebrow { font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
-  .title { font-size: 34px; line-height: 1.18; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
-  .question { font-size: 18px; font-weight: 700; color: var(--blue); margin-bottom: 18px; }
-  .footer {
-    position: absolute; left: 72px; right: 200px; bottom: 14px;
+
+  .tag { font-size: 14px; font-weight: 700; color: var(--blue); margin-bottom: 10px; letter-spacing: .5px; }
+  .title { font-size: 34px; line-height: 1.2; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .sub { font-size: 18px; color: var(--muted); margin-bottom: 24px; }
+
+  .footer { position: absolute; left: 80px; right: 200px; bottom: 16px;
     display: flex; align-items: center; justify-content: space-between;
-    border-top: 1px solid var(--line); padding-top: 8px;
-    color: var(--muted); font-size: 12px; background: #FFF; z-index: 3;
-  }
+    border-top: 1px solid var(--line); padding-top: 10px;
+    color: var(--muted); font-size: 12px; background: #FFF; z-index: 3; }
   .page { font-weight: 700; }
-  .node {
-    background: var(--light); border: 1px solid var(--line); border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; text-align: center;
-    font-size: 14px; font-weight: 700; color: var(--ink); padding: 10px 8px; line-height: 1.3;
-  }
-  .node.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .node.green { background: var(--green); border-color: var(--green); color: #0B5D46; }
-  .node.yellow { background: #FFE8A3; border-color: #F5D078; color: #5B4300; }
 
-  /* 封面 */
-  .title-band { position: absolute; top: 0; left: 0; right: 0; height: 10px;
-    background: linear-gradient(90deg, var(--sky), var(--blue) 55%, var(--green)); }
-  .title-slide .eyebrow { margin-top: 104px; }
-  .title-slide h1 { font-size: 46px; line-height: 1.12; color: var(--ink); margin: 14px 0 10px; }
-  .title-slide .subtitle { font-size: 22px; color: var(--body); }
-  .title-slide .accent-line { width: 88px; height: 8px; border-radius: 99px; background: var(--green); margin-top: 26px; }
-  .title-slide .meta { margin-top: 120px; font-size: 15px; color: var(--muted); }
-  .title-dots { position: absolute; right: 84px; top: 96px; width: 210px; height: 210px; }
-  .dot { position: absolute; border-radius: 50%; }
-  .dot-1 { width: 150px; height: 150px; background: var(--light); top: 0; left: 0; }
-  .dot-2 { width: 82px; height: 82px; background: var(--green); top: 128px; left: 148px; }
-  .dot-3 { width: 38px; height: 38px; background: var(--sky); top: 24px; left: 176px; }
+  /* 卡片 / 要点 */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 10px; }
+  .card { border-radius: 14px; padding: 26px 28px; background: var(--card); border: 1px solid var(--line); }
+  .card h3 { font-size: 20px; color: var(--ink); margin-bottom: 10px; }
+  .card p { font-size: 17px; line-height: 1.55; }
+  .card .num { font-size: 15px; font-weight: 700; color: var(--blue); margin-bottom: 10px; }
+  .bullets { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; }
+  .bullet { display: flex; gap: 14px; font-size: 19px; line-height: 1.55; color: var(--body); align-items: baseline; }
+  .bullet .dot { color: var(--blue); font-weight: 700; flex: none; }
 
-  /* 本周目标 / 下一步 */
-  .goals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 8px; }
-  .goal-card { border-radius: 14px; padding: 22px 24px; background: var(--card); border: 1px solid var(--line); }
-  .goal-card h3 { font-size: 18px; color: var(--ink); margin-bottom: 8px; }
-  .goal-card p { font-size: 15px; line-height: 1.5; }
-  .goal-card .num { font-size: 26px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
-  .steps { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-  .step-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-  .step-row .no { width: 28px; height: 28px; border-radius: 50%; background: var(--light); color: var(--ink); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none; }
-  .step-row .txt { flex: 1; font-size: 15px; color: var(--body); }
+  /* 表格 */
+  .ds-table { width: 100%; border-collapse: collapse; font-size: 19px; margin-top: 8px; }
+  .ds-table th { background: var(--light); color: var(--ink); text-align: left; padding: 14px 18px; font-size: 17px; }
+  .ds-table td { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .st { font-weight: 700; color: var(--blue); }
 
-  /* 总体进展 */
-  .kv { display: flex; gap: 10px; margin: 10px 0; font-size: 16px; }
-  .kv .k { color: var(--blue); font-weight: 700; flex: none; min-width: 100px; }
-  .kv .v { color: var(--body); }
+  /* 结构图 */
+  .arch { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 18px; }
+  .arch .node { min-width: 420px; padding: 14px 10px; font-size: 19px; font-weight: 700;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 10px;
+    color: var(--ink); text-align: center; }
+  .arch .node.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .arch .node.gray { background: var(--light); border-color: var(--line); color: var(--ink); }
+  .v-arrow { height: 22px; color: #9AA3B8; display: flex; align-items: center; justify-content: center; font-size: 17px; }
 
-  /* 系统链路 */
-  .arch { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 24px; }
-  .arch .node { min-width: 360px; padding: 12px 10px; font-size: 15px; }
-  .v-arrow { height: 20px; color: #9FB4C8; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  /* 对比双链 */
+  .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 12px; }
+  .chain { border-radius: 14px; border: 1.5px solid var(--line); padding: 20px 22px 14px; background: var(--card); }
+  .chain h3 { font-size: 19px; color: var(--ink); text-align: center; margin-bottom: 12px; }
+  .chain .cnode { padding: 9px; font-size: 16px; font-weight: 700; color: var(--ink);
+    background: #FFF; border: 1.5px solid var(--line); border-radius: 8px; text-align: center; }
+  .chain .cnode.hl { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .chain .carrow { height: 16px; color: #9AA3B8; display: flex; align-items: center; justify-content: center; font-size: 14px; }
 
-  /* 功能复现 */
-  .ds-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-  .ds-table th { background: var(--light); color: var(--ink); text-align: left; padding: 10px 12px; }
-  .ds-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); }
-  .chip { display: inline-block; background: var(--light); color: var(--ink); font-size: 12px; font-weight: 700; border-radius: 99px; padding: 3px 10px; }
-  .chip.st-ok { background: var(--green); color: #0B5D46; }
-  .chip.st-partial { background: #FFE8A3; color: #5B4300; }
-  .chip.st-no { background: #E8EDF2; color: var(--muted); }
+  /* 大数字 */
+  .bigrow { display: flex; gap: 40px; align-items: baseline; margin: 18px 0 6px; }
+  .big { font-size: 64px; font-weight: 700; color: var(--blue); line-height: 1; }
+  .big small { font-size: 22px; color: var(--muted); font-weight: 400; }
+  .big.dim { color: var(--muted); }
 
-  /* LVU 结果 */
-  .result-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 8px; }
-  .result-card { border-radius: 12px; padding: 20px; text-align: center; background: var(--card); border: 1px solid var(--line); }
-  .result-card .big { font-size: 34px; font-weight: 700; color: var(--blue); }
-  .result-card .lbl { font-size: 13px; color: var(--muted); margin-top: 6px; }
-  .result-card.hot { background: #F3FAF7; border-color: var(--green); }
-  .acc-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--body); }
-  .acc-bar { height: 14px; background: var(--light); border-radius: 99px; overflow: hidden; margin-top: 6px; }
-  .acc-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--sky), var(--green)); }
-  .acc-fill.dim { opacity: .55; }
-
-  /* 工程问题 */
-  .bugs { display: flex; flex-direction: column; gap: 12px; }
-  .bug { border-radius: 12px; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); }
-  .bug h3 { font-size: 16px; color: var(--ink); margin-bottom: 6px; }
-  .bug p { font-size: 14px; line-height: 1.6; }
-  .bug .fix { color: var(--green); font-weight: 700; }
-
-  /* 实验设计 */
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 6px; }
-  .panel { border-radius: 14px; padding: 20px 24px; }
-  .panel.blue-bg { background: var(--light); border: 1px solid var(--line); }
-  .panel.white-bg { background: #fff; border: 1px solid var(--line); }
-  .panel h3 { font-size: 18px; color: var(--ink); margin-bottom: 12px; }
-  .panel ul { list-style: none; }
-  .panel li { font-size: 15px; padding: 7px 0; border-bottom: 1px dashed var(--line); }
-  .panel li:last-child { border-bottom: 0; }
+  /* 研究发现 */
+  .find { border-left: 4px solid var(--blue); border-radius: 0 10px 10px 0;
+    background: var(--card); padding: 16px 22px; margin-bottom: 14px; }
+  .find h3 { font-size: 19px; color: var(--ink); margin-bottom: 6px; }
+  .find p { font-size: 16px; line-height: 1.6; color: var(--body); }
+  .find .hl { color: var(--blue); font-weight: 700; }
 
   .controls { position: absolute; right: 20px; bottom: 18px; z-index: 5; display: flex; gap: 8px; }
-  .controls button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 18px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,38,79,.12); }
+  .controls button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 18px; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
   .controls button:hover { background: var(--light); }
   .hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); color: var(--muted); font-size: 12px; z-index: 6; }
 </style>
@@ -140,221 +99,178 @@
 <div class="stage" id="stage">
 
   <!-- P1 封面 -->
-  <section class="slide active title-slide">
-    <div class="title-band"></div>
-    <div class="eyebrow">组会汇报 · 2026.08</div>
-    <h1>UniVA 论文复现<br />代码实现与实验验证</h1>
-    <div class="subtitle">从论文理解转向复现 · 跑通链路 · 验证 Planner 与 Memory 机制</div>
-    <div class="accent-line"></div>
-    <div class="meta">汇报人：费枭健&nbsp;&nbsp;·&nbsp;&nbsp;35 分钟组会（汇报 + 讨论）</div>
-    <div class="title-dots">
-      <div class="dot dot-1"></div>
-      <div class="dot dot-2"></div>
-      <div class="dot dot-3"></div>
+  <section class="slide active">
+    <div style="height:100%; display:flex; flex-direction:column; justify-content:center;">
+      <div class="tag">Group Meeting · 2026.08</div>
+      <div class="title" style="font-size:44px;">UniVA: Video Agent System<br />Reproduction Progress</div>
+      <div style="font-size:24px; color:var(--muted); margin-top:12px;">Code Reproduction &amp; Mechanism Verification</div>
+      <div style="margin-top:60px; font-size:16px; color:var(--muted);">汇报人：费枭健</div>
     </div>
   </section>
 
   <!-- P2 本周目标 -->
   <section class="slide">
-    <div class="eyebrow">本周工作概览</div>
-    <div class="title">本周目标</div>
-    <div class="question">上周完成论文理解，本周转向代码复现与实验验证</div>
-    <div class="goals">
-      <div class="goal-card"><div class="num">01</div><h3>跑通主要视频能力</h3><p>生成 / 理解链路完整跑通，编辑部分跑通。</p></div>
-      <div class="goal-card"><div class="num">02</div><h3>梳理代码执行链路</h3><p>PlanAgent → ActAgent → MCP 工具 → 视频模型，完整读通。</p></div>
-      <div class="goal-card"><div class="num">03</div><h3>验证 Planner / Memory</h3><p>零成本验证规划差异与三层记忆注入机制。</p></div>
+    <div class="tag">WEEKLY GOAL</div>
+    <div class="title">从论文理解，转向代码复现与机制验证</div>
+    <div class="sub">三件事贯穿本周</div>
+    <div class="cards">
+      <div class="card"><div class="num">01</div><h3>跑通视频能力</h3><p>生成 / 理解链路完成，编辑部分跑通</p></div>
+      <div class="card"><div class="num">02</div><h3>梳理执行链路</h3><p>Agent → MCP 工具 → 视频模型的完整调用链</p></div>
+      <div class="card"><div class="num">03</div><h3>验证核心机制</h3><p>Planner 规划差异 &amp; 三层 Memory 注入</p></div>
     </div>
   </section>
 
-  <!-- P3 总体进展 -->
+  <!-- P3 整体进展 -->
   <section class="slide">
-    <div class="eyebrow">系统复现进展</div>
-    <div class="title">总体进展</div>
-    <div class="question">已从用户输入到工具调用再到结果生成的完整链路验证</div>
-    <div class="kv"><span class="k">链路</span><span class="v">用户输入 → PlanAgent 拆任务 → ActAgent 调工具 → MCP 子进程 → Wavespeed/DashScope 出结果 ✅</span></div>
-    <div class="kv"><span class="k">评测框架</span><span class="v">runner 执行器 + CLIP / DINO / MLLM / QA 四类指标，本地 CPU 可算</span></div>
-    <div class="kv"><span class="k">代码理解</span><span class="v">univa_agent.py 三 Agent 职责、Task 记忆读写、MCP 工具链路已读通并加注释</span></div>
-    <div class="kv"><span class="k">机制验证</span><span class="v">Planner 规划差异（约束 vs 架构）+ 三层 Memory 注入生效，均已零成本初测</span></div>
-  </section>
-
-  <!-- P4 系统链路 -->
-  <section class="slide">
-    <div class="eyebrow">代码执行链路</div>
-    <div class="title">系统架构（已读通）</div>
-    <div class="question">UniVA 怎么从一句话到一个视频文件</div>
-    <div class="arch">
-      <div class="node">用户输入<span style="display:block;font-size:11px;font-weight:400;color:var(--muted)">"把骷髅人变成鱼人" / "这个视频里...？"</span></div>
-      <div class="v-arrow">↓</div>
-      <div class="node blue">PlanAgent（规划）<span style="display:block;font-size:11px;font-weight:400;color:rgba(255,255,255,.85)">无工具 · 输出 JSON 执行计划</span></div>
-      <div class="v-arrow">↓</div>
-      <div class="node blue">ActAgent（执行）<span style="display:block;font-size:11px;font-weight:400;color:rgba(255,255,255,.85)">绑 MCP 工具 · 每步调 1 个 · 结果回写</span></div>
-      <div class="v-arrow">↓</div>
-      <div class="node green">MCP 工具（5 个 server · 独立子进程）</div>
-      <div class="v-arrow">↓</div>
-      <div class="node yellow">Wavespeed（生成/编辑）· DashScope（视觉理解）</div>
-    </div>
-  </section>
-
-  <!-- P5 功能复现 -->
-  <section class="slide">
-    <div class="eyebrow">功能复现</div>
-    <div class="title">四类任务跑通情况</div>
-    <div class="question">生成与理解完成，编辑部分完成，分割待 GPU</div>
+    <div class="tag">OVERALL PROGRESS</div>
+    <div class="title">链路已通，机制初步验证</div>
+    <div class="sub">各模块当前状态</div>
     <table class="ds-table">
-      <tr><th>任务</th><th>状态</th><th>要点</th></tr>
-      <tr><td><strong>Generation</strong>（文生/图生/多图故事）</td><td><span class="chip st-ok">✅ 完成</span></td><td>lt2v / it2v / entity2video 全通，多图故事 15s 成片</td></tr>
-      <tr><td><strong>Understanding</strong>（长视频理解）</td><td><span class="chip st-ok">✅ 完成</span></td><td>lvu 全量评测 <strong>74.8%</strong>（下页详述）</td></tr>
-      <tr><td><strong>Editing</strong>（长视频编辑）</td><td><span class="chip st-partial">⚠️ 部分</span></td><td>分片→编辑→合并链路自实现，样本少</td></tr>
-      <tr><td><strong>Segmentation</strong>（视频分割）</td><td><span class="chip st-no">❌ 待 GPU</span></td><td>Sa2VA 依赖 CUDA，计划 AutoDL</td></tr>
+      <tr><th>模块</th><th>状态</th><th>要点</th></tr>
+      <tr><td>Generation</td><td class="st">✓ 完成</td><td>文生 / 图生 / 多图故事全通</td></tr>
+      <tr><td>Understanding</td><td class="st">✓ 完成</td><td>lvu 74.8%，接近论文 76%</td></tr>
+      <tr><td>Editing</td><td class="st">△ 部分</td><td>分片编辑链路自实现</td></tr>
+      <tr><td>Segmentation</td><td class="st">待完成</td><td>需 GPU（Sa2VA）</td></tr>
+      <tr><td>Agent 实验</td><td class="st">进行中</td><td>Single vs Dual / Memory 代码已就绪</td></tr>
     </table>
+  </section>
+
+  <!-- P4 代码架构理解 -->
+  <section class="slide">
+    <div class="tag">CODE UNDERSTANDING</div>
+    <div class="title">已定位完整调用链</div>
+    <div class="sub">不是"打开了哪些文件"，而是理解了整体结构</div>
+    <div class="arch">
+      <div class="node">Runner（评测执行器）</div>
+      <div class="v-arrow">↓</div>
+      <div class="node blue">Agent（PlanAgent 规划 / ActAgent 执行）</div>
+      <div class="v-arrow">↓</div>
+      <div class="node">MCP Tools（5 个工具 server · 子进程）</div>
+      <div class="v-arrow">↓</div>
+      <div class="node gray">Memory（Task / User / Global 三层）</div>
+    </div>
+    <div class="bullets" style="margin-top:20px">
+      <div class="bullet"><span class="dot">·</span>规划 Agent 无工具，执行 Agent 绑工具，职责分离</div>
+      <div class="bullet"><span class="dot">·</span>每步执行后结果回写计划，形成 Task 记忆闭环</div>
+    </div>
+  </section>
+
+  <!-- P5 功能复现结果 -->
+  <section class="slide">
+    <div class="tag">REPRODUCTION RESULTS</div>
+    <div class="title">生成与理解跑通，产出真实视频</div>
+    <div class="sub">每类任务都有实际产物</div>
+    <div class="cards">
+      <div class="card"><h3>Generation</h3><p>lt2v / it2v / entity2video 全通<br />多图故事 <strong>15s 成片</strong></p></div>
+      <div class="card"><h3>Understanding</h3><p>lvu 全量评测<br /><strong>74.8%</strong>（103 题全 QA）</p></div>
+      <div class="card"><h3>Editing</h3><p>长视频分片→编辑→合并<br /><strong>61s 成片</strong>（样本少）</p></div>
+    </div>
   </section>
 
   <!-- P6 LVU 结果 -->
   <section class="slide">
-    <div class="eyebrow">核心结果</div>
-    <div class="title">lvu 视频理解 · 74.8%</div>
-    <div class="question">10 个长视频 · 103 题全 QA · 64 帧均匀采样</div>
-    <div class="result-row">
-      <div class="result-card hot"><div class="big">74.8%</div><div class="lbl">我们（qwen-vl-max · 全QA）</div></div>
-      <div class="result-card"><div class="big">76%</div><div class="lbl">论文 UniVA</div></div>
-      <div class="result-card"><div class="big">75%</div><div class="lbl">论文基线 InternVL3-38B</div></div>
+    <div class="tag">KEY RESULT</div>
+    <div class="title">理解模块基本复现，结果接近论文</div>
+    <div class="sub">长视频问答 · 全量评测</div>
+    <div class="bigrow">
+      <div><div class="big">74.8%<small> &nbsp;Ours</small></div></div>
+      <div><div class="big dim">76%<small> &nbsp;Paper</small></div></div>
+      <div><div class="big dim">75%<small> &nbsp;Baseline</small></div></div>
     </div>
-    <div class="acc-line" style="margin-top:18px">
-      <div class="acc-label"><span>InternVL3-38B</span><span>75%</span></div>
-      <div class="acc-bar"><div class="acc-fill dim" style="width:75%"></div></div>
-      <div class="acc-label" style="margin-top:6px;"><span>UniVA（论文）</span><span>76%</span></div>
-      <div class="acc-bar"><div class="acc-fill dim" style="width:76%"></div></div>
-      <div class="acc-label" style="margin-top:6px;"><span style="color:#0B5D46;">我们</span><span style="color:#0B5D46;">74.8%</span></div>
-      <div class="acc-bar"><div class="acc-fill" style="width:74.8%"></div></div>
-    </div>
-    <div class="test-note" style="margin-top:16px">
-      <strong>口径：</strong>全 QA（非抽样）、选择题字母匹配 + 简答 LLM judge。模型与论文不同（qwen-vl-max），数字接近属初步验证。
+    <div class="bullets" style="margin-top:16px">
+      <div class="bullet"><span class="dot">·</span>103 个 QA 样本，全部问题统一评测</div>
+      <div class="bullet"><span class="dot">·</span>选择题字母匹配 + 简答题 LLM judge</div>
+      <div class="bullet"><span class="dot">·</span>理解模块链路正常，数字接近论文（模型不同，属初步验证）</div>
     </div>
   </section>
 
-  <!-- P7 工程问题与发现 -->
+  <!-- P7 复现中的问题与发现 -->
   <section class="slide">
-    <div class="eyebrow">代码理解与工程问题</div>
-    <div class="title">复现过程中发现的两个问题</div>
-    <div class="question">比起"跑了多少指标"，这些发现更像科研</div>
-    <div class="bugs">
-      <div class="bug">
-        <h3>问题 1：工具信息影响 Planner 能力</h3>
-        <p>案例：long_video_edit（长视频编辑）规划全挂——工具注册进 MCP，但没同步进 plan.txt 工具描述，Planner 根本不知道有它。<span class="fix">结论：</span>Agent 能力不仅取决于 LLM，也取决于工具描述与约束。</p>
-      </div>
-      <div class="bug">
-        <h3>问题 2：评测口径决定结论</h3>
-        <p>案例：lvu 之前只测第 1 问 + 32 帧只有 60%；调整为<strong>全 QA + 64 帧</strong>后到 74.8%。<span class="fix">结论：</span>评测流程必须严格对齐论文，否则复现数字不可比。</p>
-      </div>
+    <div class="tag">FINDINGS</div>
+    <div class="title">复现过程中发现的问题</div>
+    <div class="sub">三个问题，指向 Agent 机制的本质</div>
+    <div class="find">
+      <h3>Tool description 影响 Planner</h3>
+      <p>long_video_edit 无法被规划 → 工具注册进 MCP 但未同步进 plan.txt。
+      <span class="hl">启示：Agent 能力依赖工具描述质量，不只是 LLM。</span></p>
+    </div>
+    <div class="find">
+      <h3>API 成本问题</h3>
+      <p>视频生成单价高（~$0.3-0.5/次）。<span class="hl">措施：小样本验证机制，不做全量烧钱。</span></p>
+    </div>
+    <div class="find">
+      <h3>评测口径问题</h3>
+      <p>lvu 结果曾偏低 → 根因是只测第 1 问、帧数不足。
+      <span class="hl">全 QA + 64 帧后到 74.8%。启示：评测需严格对齐论文。</span></p>
     </div>
   </section>
 
-  <!-- P8 Planner 实验设计 -->
+  <!-- P8 Single vs Dual 实验设计 -->
   <section class="slide">
-    <div class="eyebrow">核心实验设计 · 论文贡献 2</div>
+    <div class="tag">EXPERIMENT DESIGN · Contribution 2</div>
     <div class="title">Single Agent vs Dual Agent</div>
-    <div class="question">Planner-Actor 分工是否有效？</div>
-    <div class="two-col">
-      <div class="panel blue-bg">
-        <h3>控制变量</h3>
-        <ul>
-          <li>相同：prompt / 工具 / 模型 / session 记忆</li>
-          <li>变化：<strong>Agent 结构</strong>（单 Agent 全包 vs 规划-执行分工）</li>
-        </ul>
+    <div class="sub">显式规划是否改善工具编排？</div>
+    <div class="dual">
+      <div class="chain">
+        <h3>Single Agent</h3>
+        <div class="cnode">User</div><div class="carrow">↓</div>
+        <div class="cnode">LLM</div><div class="carrow">↓</div>
+        <div class="cnode">Tool</div>
       </div>
-      <div class="panel white-bg">
-        <h3>指标</h3>
-        <ul>
-          <li><strong>Success Rate</strong> — 计划有效 + 执行产出</li>
-          <li><strong>Tool Sequence</strong> — 实际工具调用序列</li>
-          <li><strong>简化 wPED</strong> — 计划与参考的工具序列编辑距离</li>
-        </ul>
+      <div class="chain">
+        <h3>Dual Agent</h3>
+        <div class="cnode">User</div><div class="carrow">↓</div>
+        <div class="cnode hl">Planner</div><div class="carrow">↓</div>
+        <div class="cnode">Plan</div><div class="carrow">↓</div>
+        <div class="cnode hl">Actor</div><div class="carrow">↓</div>
+        <div class="cnode">Tool</div>
       </div>
     </div>
-    <div class="test-note" style="margin-top:16px">
-      <strong>现状：</strong>Single 模式代码已实现（--mode single），与 Plan-Act 共用同一 MCP 连接与记忆，只差分工。
+    <div class="bullets" style="margin-top:18px">
+      <div class="bullet"><span class="dot">·</span>控制变量：同 prompt / 同工具 / 同模型，只变结构</div>
+      <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · 简化 wPED</div>
     </div>
   </section>
 
-  <!-- P9 Planner 初测结果 -->
+  <!-- P9 Memory 实验设计 -->
   <section class="slide">
-    <div class="eyebrow">Planner 初测（零成本规划层）</div>
-    <div class="title">规划差异的初步观察</div>
-    <div class="question">6 类任务 × 纯 LLM 规划，不调生成 API</div>
-    <div class="result-row">
-      <div class="result-card"><div class="big">18/18</div><div class="lbl">两者计划有效性</div></div>
-      <div class="result-card"><div class="big">12/18</div><div class="lbl">Plan-Act 工具选对</div></div>
-      <div class="result-card"><div class="big">13/18</div><div class="lbl">Single 工具选对</div></div>
-    </div>
-    <div class="test-note" style="margin-top:16px">
-      <strong>关键发现：</strong>给 plan.txt 加硬约束（步骤最少化 / 禁止重复 / 优先原子工具）后，Plan-Act 工具选对从 <strong>3/6 → 12/18</strong>。
-      说明规划质量 = 架构 + 约束；lve 全挂是工具未同步进 prompt，已在修复。
-    </div>
-  </section>
-
-  <!-- P10 Memory 实验设计 -->
-  <section class="slide">
-    <div class="eyebrow">核心实验设计 · 论文贡献 3</div>
+    <div class="tag">EXPERIMENT DESIGN · Contribution 3</div>
     <div class="title">Memory Ablation</div>
-    <div class="question">三层 Memory 是否有效？</div>
-    <div class="two-col">
-      <div class="panel blue-bg">
-        <h3>消融设计</h3>
-        <ul>
-          <li><strong>Full Memory</strong>（task+user+global）</li>
-          <li>- no Task（历史执行记录）</li>
-          <li>- no User（用户偏好）</li>
-          <li>- no Global（领域知识）</li>
-        </ul>
+    <div class="sub">三层记忆是否各有效？</div>
+    <div class="dual">
+      <div class="chain">
+        <h3>Full Memory</h3>
+        <div class="cnode hl">Task</div><div class="carrow">↓</div>
+        <div class="cnode hl">User</div><div class="carrow">↓</div>
+        <div class="cnode hl">Global</div>
+        <div style="text-align:center; font-size:15px; color:var(--muted); margin-top:10px;">逐步移除一层，对比规划效果</div>
       </div>
-      <div class="panel white-bg">
+      <div class="chain">
         <h3>现状</h3>
-        <ul>
-          <li>三层 Memory 已全部实现（Task 原有 + User/Global 新增）</li>
-          <li>注入验证通过：lve 计划描述出现"电影感暖色调"（User 偏好生效）</li>
-          <li>完整消融数据待余额后跑</li>
-        </ul>
+        <div class="cnode">三层已实现</div>
+        <div class="cnode">注入已验证</div>
+        <div style="font-size:15px; color:var(--body); margin-top:10px; line-height:1.6;">
+          实测：User 偏好注入后，计划描述出现"电影感暖色调"，偏好被模型采用
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- P11 当前问题 -->
+  <!-- P10 下一步 -->
   <section class="slide">
-    <div class="eyebrow">诚实面对限制</div>
-    <div class="title">当前问题</div>
-    <div class="bugs">
-      <div class="bug">
-        <h3>① 生成成本限制，未跑完整 UniVA-Bench</h3>
-        <p>Wavespeed 生成单价高（~$0.3-0.5/次），当前先做小样本验证核心机制，全量 57 条后续跑。</p>
-      </div>
-      <div class="bug">
-        <h3>② 部分指标依赖参考计划（数据集未提供）</h3>
-        <p>论文 wPED 需要参考计划，UniVA-Bench 公开数据没带，当前用标准工具链做简化代理。</p>
-      </div>
-      <div class="bug">
-        <h3>③ 当前是机制验证，非完整 benchmark 复现</h3>
-        <p>目标是验证核心趋势（Planner/Memory 是否有效），不等同逐条对齐论文数字。</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- P12 下一步 -->
-  <section class="slide">
-    <div class="eyebrow">下一步计划</div>
+    <div class="tag">NEXT STEPS</div>
     <div class="title">接下来做三件事</div>
-    <div class="steps">
-      <div class="step-row"><span class="no">1</span><span class="txt">完成 Single vs Dual 小样本实验（Success Rate / Tool Sequence / 简化 wPED）</span></div>
-      <div class="step-row"><span class="no">2</span><span class="txt">完成 Memory 消融（5 种组合 × 量化指标）</span></div>
-      <div class="step-row"><span class="no">3</span><span class="txt">补充 Segmentation（AutoDL 租 3090 跑 Sa2VA）</span></div>
+    <div class="cards">
+      <div class="card"><div class="num">1</div><h3>Single vs Dual 小样本</h3><p>执行层 Success Rate / Tool Sequence / 简化 wPED</p></div>
+      <div class="card"><div class="num">2</div><h3>Memory 消融</h3><p>5 种记忆组合 × 量化指标</p></div>
+      <div class="card"><div class="num">3</div><h3>Segmentation</h3><p>AutoDL 租 3090 跑 Sa2VA</p></div>
     </div>
-    <div style="margin-top:26px;text-align:center;color:var(--muted);font-size:15px;">
-      谢谢 · 欢迎讨论（核心问题：Planner/Memory 机制是否有效、工程发现的意义）
-    </div>
+    <div style="margin-top:28px; text-align:center; color:var(--muted); font-size:16px;">谢谢 · 欢迎讨论</div>
   </section>
 
   <div class="footer">
-    <span>UniVA 复现工作 · 35 分钟组会</span>
-    <span class="page" id="pageNum">01 / 12</span>
+    <span>UniVA Reproduction · 组会汇报</span>
+    <span class="page" id="pageNum">01 / 10</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>
