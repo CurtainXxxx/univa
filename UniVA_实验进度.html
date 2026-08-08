@@ -160,6 +160,10 @@
   .ds-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); }
   .ds-table tr:last-child td { border-bottom: 0; }
   .chip { display: inline-block; background: var(--light); color: var(--ink); font-size: 11px; font-weight: 700; border-radius: 99px; padding: 2px 8px; }
+  .chip.st-ok { background: var(--green); color: #0B5D46; }
+  .chip.st-partial { background: #FFE8A3; color: #5B4300; }
+  .chip.st-no { background: #E8EDF2; color: var(--muted); }
+  .chip.st-code { background: var(--light); color: var(--ink); }
 
   /* lvu result */
   .result-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 10px; }
@@ -296,6 +300,31 @@
           <li>seg 评测 ⏳<small>计划 AutoDL 跑</small></li>
         </ul>
       </div>
+    </div>
+  </section>
+
+  <!-- Slide 4b: 实验总结表 -->
+  <section class="slide">
+    <div class="eyebrow">实验总览</div>
+    <div class="title">实验总结表</div>
+    <div class="question">截至 2026-08 所有模块状态与结果</div>
+    <table class="ds-table">
+      <tr><th>模块</th><th>状态</th><th>结果</th></tr>
+      <tr><td><strong>Text2Video</strong>（lt2v 文生视频）</td><td><span class="chip st-ok">✅ 完成</span></td><td>链路通 · CLIP 0.2776 单点（论文 0.2814）</td></tr>
+      <tr><td><strong>Image2Video</strong>（it2v 图生视频）</td><td><span class="chip st-ok">✅ 完成</span></td><td>链路通 · 参考图→视频</td></tr>
+      <tr><td><strong>Entity2Video</strong>（多图故事）</td><td><span class="chip st-ok">✅ 完成</span></td><td>15s 成片完整验证</td></tr>
+      <tr><td><strong>Video Understanding</strong>（lvu）</td><td><span class="chip st-ok">✅ 完成</span></td><td><strong>74.8%</strong>（103题全QA，论文 76%）</td></tr>
+      <tr><td><strong>Video Editing</strong>（lve/v2v）</td><td><span class="chip st-partial">⚠️ 部分</span></td><td>61s/31s 成片 · 链路通 · 样本少</td></tr>
+      <tr><td><strong>Segmentation</strong>（seg）</td><td><span class="chip st-no">❌ 未做</span></td><td>需 GPU（计划 AutoDL）</td></tr>
+      <tr><td><strong>Planner 对比</strong>（结论2·规划层）</td><td><span class="chip st-partial">⚠️ 初测</span></td><td>工具选对 12/18 vs 13/18 · 计划有效 18/18</td></tr>
+      <tr><td><strong>Single Agent</strong>（结论2·执行层）</td><td><span class="chip st-code">✅ 代码完成</span></td><td>待实验（等余额）</td></tr>
+      <tr><td><strong>Memory Ablation</strong>（结论3）</td><td><span class="chip st-partial">⚠️ 初测</span></td><td>三层实现 · 注入生效 · 待扩展</td></tr>
+      <tr><td><strong>指标框架</strong></td><td><span class="chip st-ok">✅ 完成</span></td><td>CLIP / DINO / MLLM / QA 全可用</td></tr>
+      <tr><td><strong>评测框架</strong></td><td><span class="chip st-ok">✅ 完成</span></td><td>runner + success_rate + plan_only</td></tr>
+    </table>
+    <div class="test-note" style="margin-top:14px">
+      <strong>口径说明：</strong>"完成" = 链路跑通且有产出；"初测" = 初步验证但样本/深度不足；
+      执行层实验（Success Rate / wPED）待余额后跑。
     </div>
   </section>
 
@@ -604,7 +633,7 @@
 
   <div class="footer">
     <span>UniVA · 实验进度</span>
-    <span class="page" id="pageNum">01 / 15</span>
+    <span class="page" id="pageNum">01 / 16</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>
