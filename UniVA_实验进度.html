@@ -536,8 +536,9 @@
         <p>PlanAgent 生成"if 失败 then"计划时，ActAgent 不理解条件语义，成功仍执行后续步骤（浪费 API）。</p>
       </div>
       <div class="bug">
-        <h3>③ Memory 消融未做</h3>
-        <p>User/Global 记忆未实现（论文设计 3 层，仓库只有 Task 层），结论3 的消融实验待做。</p>
+        <h3>③ Memory 消融（代码已完，数据待跑）</h3>
+        <p>三层记忆已补齐：Task（原有）+ User（偏好）+ Global（TF-IDF 检索 10 条知识库），memory_cfg 五组合注入。
+        <span class="fix">无MCP冒烟验证：</span>lve 上 user 注入让计划描述从英文变为"电影感暖色调"（偏好生效），工具选择不受干扰。消融数据等余额跑。</p>
       </div>
       <div class="bug">
         <h3>④ 对照实验待跑</h3>
