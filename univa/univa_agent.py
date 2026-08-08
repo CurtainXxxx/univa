@@ -1,3 +1,20 @@
+"""
+UniVA 核心 Agent 编排层
+=======================
+定义三个 Agent 与总控系统：
+
+  - PlanAgent   ：规划 Agent（无工具，纯 LLM 把请求拆成 JSON 执行计划）
+  - ActAgent    ：执行 Agent（绑 MCP 工具，按计划逐步调用工具）
+  - SingleAgent ：结论2 对照组（一个 Agent 同时规划+执行）
+  - PlanActSystem：总装配（MCP 连接 + 记忆存储 + 对外 execute_task/execute_single）
+
+调用链：用户输入 → PlanActSystem.execute_task
+          → PlanAgent.generate_plan（拆计划）
+          → ActAgent.execute_plan（执行每步）
+          → inject_execution_results（记忆回写 SQLite，供下次规划）
+
+本文件不直接调生成 API，真正的视频生成在 mcp_tools/*.py。
+"""
 import asyncio
 import json
 import os
@@ -105,12 +122,20 @@ def extract_plan_from_content(content: str) -> Optional[Dict]:
 
 
 class PlanAgent:
+    """规划 Agent：把用户请求拆成 JSON 执行计划。
+
+    关键设计（论文 Plan-Act 的核心）：**不绑定任何工具**——
+    规划阶段只负责"想清楚做什么"，真正调用工具的是 ActAgent。
+    """
+
     def __init__(self, mcp_tools: MultiMCPTools, plan_db):
         self.mcp_tools = mcp_tools
 
+        # 指令 = plan.txt（工具清单 + 计划 JSON 格式约束），指导 LLM 如何拆计划
         plan_prompt = load_prompt("plan")
         full_instructions = f"{plan_prompt}\n"
 
+        # 模型配置从 univa/config/config.toml 读取（plan_model_* 段）
         plan_model_provider = config.get('plan_model_provider', 'openai')
         plan_model_id = config.get('plan_model_id', 'gpt-5-2025-08-07')
         plan_model_api_key = config.get('plan_model_api_key', '')
@@ -126,10 +151,12 @@ class PlanAgent:
                 base_url=plan_model_base_url or None,
                 extra_params=plan_model_extra_params,
             ),
+            # 注意：没有 tools= 参数 → 规划 Agent 无法调用工具
             instructions=full_instructions,
-            db=plan_db,
-            add_history_to_context=True,
+            db=plan_db,                        # Task 记忆存这里（SQLite）
+            add_history_to_context=True,       # 把历史消息拼进上下文
             num_history_messages=10,
+            # session_state 是 agno 的会话级状态，execution_history 就是 Task Memory
             session_state={
                 "execution_history": []
             }
@@ -146,13 +173,20 @@ class PlanAgent:
         return extract_plan_from_content(content)
 
     async def generate_plan(self, session_id, user_request: str) -> Optional[Dict]:
+        """生成执行计划。
+
+        Task 记忆读取：从 SQLite 里取出本 session 的历史执行记录（execution_history），
+        拼进输入上下文，让模型"记得上一轮做了什么"——这是论文 Task Memory 的读路径。
+        """
         input_context = f"User Request: {user_request}\n"
 
+        # 读记忆：拿到之前所有 {plan, execution_results}
         try:
             execution_historys = self.agent.get_session_state(session_id).get("execution_history", None)
         except Exception:
             execution_historys = None
 
+        # 把历史注入上下文（并提醒只处理最新请求，别重复旧任务）
         if execution_historys:
             input_context += "\n### Previous Execution Results:\n"
             input_context += json.dumps(execution_historys, indent=2, ensure_ascii=False)
@@ -166,16 +200,23 @@ class PlanAgent:
         )
 
         plan_output = response.content
+        # LLM 输出可能是 ```json 代码块或纯文字，统一提取成 dict
         plan_output_format = self.extract_plan_from_content(plan_output)
 
         return plan_output_format
 
     def inject_execution_results(self, session_id, plan, execution_results: Dict[int, Any]) -> Dict:
+        """执行后回写记忆（Task Memory 的写路径）。
+
+        把「本轮计划 + 每步执行结果」追加进 execution_history，存回 SQLite，
+        下次 generate_plan 时就能读出来。
+        """
         try:
             current_state = self.agent.get_session_state(session_id).get("execution_history", [])
         except Exception:
             current_state = []
 
+        # 追加本轮记录（注意是 append，历史会越攒越长）
         current_state.append(
             {
                 "plan": plan,
@@ -190,9 +231,16 @@ class PlanAgent:
 
 
 class ActAgent:
+    """执行 Agent：按 PlanAgent 的计划逐个调用 MCP 工具。
+
+    与 PlanAgent 的关键差异：**绑定了 tools=[mcp_tools]**，有调用工具的能力。
+    tool_call_limit=1 让每步只调一次工具，结果可验证后再进下一步。
+    """
+
     def __init__(self, mcp_tools: MultiMCPTools, act_db=None):
         self.mcp_tools = mcp_tools
 
+        # 执行模型配置（act_model_* 段），通常和规划模型不同
         act_model_provider = config.get('act_model_provider', 'openai')
         act_model_id = config.get('act_model_id', 'gpt-5-2025-08-07')
         act_model_api_key = config.get('act_model_api_key', '')
@@ -208,7 +256,7 @@ class ActAgent:
                 base_url=act_model_base_url or None,
                 extra_params=act_model_extra_params,
             ),
-            tools=[mcp_tools],
+            tools=[mcp_tools],  # 有工具：执行 Agent 能真正调 MCP 工具
             instructions="""
             # Intelligent Video Task Execution Assistant
 
@@ -230,6 +278,10 @@ class ActAgent:
         )
 
     async def execute_plan(self, question, plan) -> Dict[str, Any]:
+        """按计划逐步执行，返回 {步骤号: 该步结果} 字典。
+
+        每步执行后都会 update_plan 把结果写回计划（状态回填）。
+        """
         execution_results: Dict[int, Any] = {}
 
         for idx, step in enumerate(plan['execution_plan']['steps']):
@@ -238,7 +290,7 @@ class ActAgent:
                 result = await self._execute_step(step, question, plan, execution_results)
 
                 execution_results[idx+1] = result
-                plan = self.update_plan(plan, result, idx)
+                plan = self.update_plan(plan, result, idx)  # 状态回写计划
                 logger.info(f"Step {idx+1} completed successfully")
 
             except Exception as e:
@@ -249,6 +301,9 @@ class ActAgent:
         return execution_results
 
     async def _execute_step(self, step, question, plan, execution_results) -> Any:
+        """执行单步：把「问题 + 全计划 + 已完成步骤 + 当前步骤」拼成上下文，
+        让 ActAgent 只处理当前这一步（论文：每步只做一个动作）。
+        """
         input_context = f"""
         ### User Request
         {question}
@@ -318,6 +373,10 @@ class ActAgent:
             return None
 
     def update_plan(self, plan, step_result, idx):
+        """把单步执行结果回填进计划：更新该步 status（成功/失败）和 output。
+
+        执行后计划带着真实结果，PlanAgent 下轮规划就能看到。
+        """
         if step_result is None:
             logger.error(f"step_result is None for step {idx+1}")
             plan['execution_plan']['steps'][idx]['status'] = 'failed'
@@ -364,9 +423,11 @@ class SingleAgent:
     相同模型、相同工具集、相同 session 记忆，仅差异在"分工"。
     """
 
-    def __init__(self, mcp_tools: MultiMCPTools, db=None,
+    def __init__(self, mcp_tools: MultiMCPTools = None, db=None,
                  max_run_seconds: int = 600, tool_call_limit: int = 10):
         """Args:
+            mcp_tools: MCP 工具。传 None 时构造纯规划 Agent（无工具，零成本，
+                用于 plan_only 对比 Planner 差异）。
             max_run_seconds: 单轮总超时（秒），防止模型循环调用烧钱。
             tool_call_limit: 单轮工具调用上限（一次生成约 $0.3-0.5，控制成本）。
         """
@@ -392,7 +453,7 @@ class SingleAgent:
                 extra_params=model_extra_params,
             ),
             instructions=full_instructions,
-            tools=[mcp_tools],
+            tools=[mcp_tools] if mcp_tools else [],
             tool_call_limit=tool_call_limit,  # 关键：一次对话内规划+连环调工具（上限控制成本）
             db=db,
             add_history_to_context=True,
@@ -449,8 +510,16 @@ class SingleAgent:
 
 
 class PlanActSystem:
+    """总装配：连接 MCP 工具、持有记忆数据库、编排三个 Agent。
+
+    对外两个入口：
+      - execute_task()     ：Plan-Act 双 Agent 主流程
+      - execute_single()   ：Single-Agent 对照（结论2 实验）
+    """
+
     def __init__(self, mcp_command: List[str], db_file: str = "plan_act_system"):
         mcp_tools_path = config.get('mcp_tools_path')
+        # MultiMCPTools：管理多个 MCP server 的连接（每个 server 是独立子进程）
         self.mcp_tools = MultiMCPTools(
             commands=mcp_command,
             env={
@@ -460,18 +529,21 @@ class PlanActSystem:
             timeout_seconds=600,
             refresh_connection=True
         )
+        # Task 记忆数据库：plan_act_system_plan.db（SQLite，表 agno_sessions）
         self._plan_db = SqliteDb(db_file=f"{db_file}_plan.db")
         self.plan_agent = None
         self.act_agent = None
         self.single_agent = None
 
     async def __aenter__(self):
+        """async 上下文进入：先连接 MCP，再创建两个 Agent（懒加载到 execute 时才用）。"""
         await self.mcp_tools.connect()
         self.plan_agent = PlanAgent(self.mcp_tools, self._plan_db)
         self.act_agent = ActAgent(self.mcp_tools)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """async 上下文退出：关闭所有 MCP 子进程。"""
         await self.mcp_tools.close()
 
     async def execute_single(self, session_id, user_request: str) -> Dict[str, Any]:
@@ -485,6 +557,8 @@ class PlanActSystem:
         return await self.single_agent.run(session_id, user_request)
 
     async def execute_task(self, session_id, user_request: str) -> Dict[str, Any]:
+        """Plan-Act 主流程（论文核心）：规划 → 执行 → 记忆回写，共三步。"""
+        # ① 规划：PlanAgent 拆出执行计划（JSON）
         execution_plan = await self.plan_agent.generate_plan(session_id, user_request)
 
         # 防御：PlanAgent 解析失败时返回的是字符串而非 dict
@@ -500,7 +574,9 @@ class PlanActSystem:
                 }
             }
 
+        # ② 执行：ActAgent 逐步骤调用 MCP 工具，返回 {步骤号: 结果}
         results = await self.act_agent.execute_plan(user_request, execution_plan)
+        # ③ 记忆回写：把「计划 + 结果」存进 SQLite（Task Memory 写路径）
         self.plan_agent.inject_execution_results(session_id, execution_plan, results)
 
         return {
@@ -585,9 +661,14 @@ class PlanActSystem:
 
 
 async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem:
+    """工厂函数：读 MCP 配置 → 启动所有 server 子进程 → 返回就绪的 PlanActSystem。
+
+    mcp_config_path 传 eval/mcp_configs_eval.json 可指定评测用配置（哪些 server 启动）。
+    """
     config_path = mcp_config_path or config.get('mcp_servers_config')
 
     try:
+        # 从 JSON 里读出每个 server 的启动命令（如 "python -m mcp_tools.video_gen"）
         with open(config_path, 'r', encoding='utf-8') as f:
             mcp_config = json.load(f)
 
@@ -609,6 +690,7 @@ async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem
         logger.error(f"Error loading MCP config: {e}, using default")
         mcp_commands = ["npx -y @modelcontextprotocol/server-filesystem /tmp"]
 
+    # 启动并连接所有 MCP 子进程
     global_plan_act_system = PlanActSystem(mcp_command=mcp_commands)
     await global_plan_act_system.__aenter__()
 
@@ -628,6 +710,10 @@ def format_result(result: Dict) -> str:
 
 
 async def main():
+    """交互式 CLI 入口：python univa_agent.py 后输入请求即可执行 Plan-Act 链路。
+
+    所有交互共用同一个 session_id → 共享 Task 记忆（能看到跨轮记忆效果）。
+    """
     system = await initialize_global_agents()
     session_id = "test_interactive_session_001"
 
