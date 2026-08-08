@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>UniVA Reproduction · 组会汇报</title>
+<title>UniVA 复现 · 组会汇报</title>
 <style>
   :root {
     --ink: #1A1A2E;        /* 深黑正文 */
@@ -101,16 +101,16 @@
   <!-- P1 封面 -->
   <section class="slide active">
     <div style="height:100%; display:flex; flex-direction:column; justify-content:center;">
-      <div class="tag">Group Meeting · 2026.08</div>
-      <div class="title" style="font-size:44px;">UniVA: Video Agent System<br />Reproduction Progress</div>
-      <div style="font-size:24px; color:var(--muted); margin-top:12px;">Code Reproduction &amp; Mechanism Verification</div>
+      <div class="tag">组会汇报 · 2026.08</div>
+      <div class="title" style="font-size:44px;">UniVA：视频智能体系统<br />复现进展</div>
+      <div style="font-size:24px; color:var(--muted); margin-top:12px;">代码复现与机制验证</div>
       <div style="margin-top:60px; font-size:16px; color:var(--muted);">汇报人：费枭健</div>
     </div>
   </section>
 
   <!-- P2 本周目标 -->
   <section class="slide">
-    <div class="tag">WEEKLY GOAL</div>
+    <div class="tag">本周目标</div>
     <div class="title">从论文理解，转向代码复现与机制验证</div>
     <div class="sub">三件事贯穿本周</div>
     <div class="cards">
@@ -122,7 +122,7 @@
 
   <!-- P3 整体进展 -->
   <section class="slide">
-    <div class="tag">OVERALL PROGRESS</div>
+    <div class="tag">整体进展</div>
     <div class="title">链路已通，机制初步验证</div>
     <div class="sub">各模块当前状态</div>
     <table class="ds-table">
@@ -137,7 +137,7 @@
 
   <!-- P4 代码架构理解 -->
   <section class="slide">
-    <div class="tag">CODE UNDERSTANDING</div>
+    <div class="tag">代码理解</div>
     <div class="title">已定位主要调用链</div>
     <div class="sub">不是"打开了哪些文件"，而是理解了整体结构</div>
     <div class="arch">
@@ -157,7 +157,7 @@
 
   <!-- P5 功能复现结果 -->
   <section class="slide">
-    <div class="tag">REPRODUCTION RESULTS</div>
+    <div class="tag">复现结果</div>
     <div class="title">生成与理解跑通，产出真实视频</div>
     <div class="sub">每类任务都有实际产物</div>
     <div class="cards">
@@ -169,13 +169,13 @@
 
   <!-- P6 LVU 结果 -->
   <section class="slide">
-    <div class="tag">KEY RESULT</div>
+    <div class="tag">核心结果</div>
     <div class="title">理解模块基本复现，结果接近论文</div>
     <div class="sub">长视频问答 · 全量评测</div>
     <div class="bigrow">
-      <div><div class="big">74.8%<small> &nbsp;Ours</small></div></div>
-      <div><div class="big dim">76%<small> &nbsp;Paper</small></div></div>
-      <div><div class="big dim">75%<small> &nbsp;Baseline</small></div></div>
+      <div><div class="big">74.8%<small> &nbsp;我们</small></div></div>
+      <div><div class="big dim">76%<small> &nbsp;论文</small></div></div>
+      <div><div class="big dim">75%<small> &nbsp;基线</small></div></div>
     </div>
     <div class="bullets" style="margin-top:16px">
       <div class="bullet"><span class="dot">·</span>103 个 QA 样本，全部问题统一评测</div>
@@ -186,7 +186,7 @@
 
   <!-- P7 复现中的问题与发现 -->
   <section class="slide">
-    <div class="tag">FINDINGS</div>
+    <div class="tag">关键发现</div>
     <div class="title">Agent 系统复现中的关键影响因素</div>
     <div class="sub">三个因素，决定 Agent 能不能做好</div>
     <div class="find">
@@ -194,18 +194,18 @@
       <p>· 工具注册 ≠ Agent 可见<br />· Tool specification 直接决定规划质量</p>
     </div>
     <div class="find">
-      <h3>Evaluation Protocol 影响结果</h3>
+      <h3>评测口径影响结果</h3>
       <p>· lvu 曾偏低 → 全 QA + 64 帧后 74.8%<br />· 评测需严格对齐论文，否则数字不可比</p>
     </div>
     <div class="find">
-      <h3>API Cost 限制实验规模</h3>
+      <h3>API 成本限制实验规模</h3>
       <p>· 生成单价 ~$0.3-0.5/次<br />· 优先小样本验证机制，再做全量</p>
     </div>
   </section>
 
   <!-- P8 Single vs Dual 实验设计 -->
   <section class="slide">
-    <div class="tag">EXPERIMENT DESIGN · Contribution 2</div>
+    <div class="tag">实验设计 · 论文贡献 2</div>
     <div class="title">Single Agent vs Dual Agent</div>
     <div class="sub">显式规划是否改善工具编排？</div>
     <div class="dual">
@@ -233,7 +233,7 @@
 
   <!-- P9 Memory 实验设计 -->
   <section class="slide">
-    <div class="tag">EXPERIMENT DESIGN · Contribution 3</div>
+    <div class="tag">实验设计 · 论文贡献 3</div>
     <div class="title">Memory Ablation</div>
     <div class="sub">三层记忆是否各有效？</div>
     <div class="dual">
@@ -257,7 +257,7 @@
 
   <!-- P10 下一步 -->
   <section class="slide">
-    <div class="tag">NEXT STEPS</div>
+    <div class="tag">下一步计划</div>
     <div class="title">接下来做三件事</div>
     <div class="cards">
       <div class="card"><div class="num">1</div><h3>Single vs Dual 小样本</h3><p>执行层 Success Rate / Tool Sequence / wPED 近似</p></div>
@@ -268,7 +268,7 @@
   </section>
 
   <div class="footer">
-    <span>UniVA Reproduction · 组会汇报</span>
+    <span>UniVA 复现 · 组会汇报</span>
     <span class="page" id="pageNum">01 / 10</span>
   </div>
   <div class="controls">
