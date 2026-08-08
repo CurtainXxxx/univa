@@ -382,6 +382,32 @@
     </div>
   </section>
 
+  <!-- Slide 7b: Planner 对比 -->
+  <section class="slide">
+    <div class="eyebrow">Agentic Probing · 零成本验证</div>
+    <div class="title">Planner 差异对比（只规划不执行）</div>
+    <div class="question">同一批 prompt，Plan-Act vs Single 各输出什么计划（纯 LLM，不调生成 API）</div>
+    <div class="result-row">
+      <div class="result-card hot"><div class="big">5/6</div><div class="lbl">Plan-Act 工具选对（约束后）</div></div>
+      <div class="result-card hot"><div class="big">5/6</div><div class="lbl">Single 工具选对</div></div>
+      <div class="result-card"><div class="big">6/6</div><div class="lbl">两者计划有效性（约束后）</div></div>
+      <div class="result-card"><div class="big">3→5</div><div class="lbl">Plan-Act 工具选对提升</div></div>
+    </div>
+    <div class="acc-line">
+      <div class="acc-label"><span>Plan-Act 工具选对（未约束）</span><span>3/6</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:50%;opacity:.55"></div></div>
+      <div class="acc-label" style="margin-top:8px;"><span>Plan-Act 工具选对（plan.txt 硬约束）</span><span>5/6</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:83%"></div></div>
+      <div class="acc-label" style="margin-top:8px;"><span>Single 工具选对</span><span>5/6</span></div>
+      <div class="acc-bar"><div class="acc-fill" style="width:83%;opacity:.55"></div></div>
+    </div>
+    <div class="test-note" style="margin-top:16px">
+      <strong>结论：</strong>Planner 质量 = 架构 + 约束。PlanAgent 在硬约束（steps 非空 / 步骤最少化 / 禁止重复 / 优先原子工具）下从 3/6 追平 Single 到 5/6，计划有效性 6/6。
+      剩余 1 条（lt_2 长文本）两者都选 storyvideo_gen——模型认为 50s 视频该用多镜头 workflow，属"合理但不符合 benchmark 期望"。
+      证明显式 Planner 的价值依赖约束强度或模型能力（论文用 Claude-Sonnet-4 当 Planner 的原因）。
+    </div>
+  </section>
+
   <!-- Slide 7: lvu result -->
   <section class="slide">
     <div class="eyebrow">理解类成果</div>
@@ -539,7 +565,7 @@
 
   <div class="footer">
     <span>UniVA · 实验进度</span>
-    <span class="page" id="pageNum">01 / 13</span>
+    <span class="page" id="pageNum">01 / 14</span>
   </div>
   <div class="controls">
     <button id="prevBtn" aria-label="上一页">←</button>

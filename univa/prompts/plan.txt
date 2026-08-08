@@ -59,6 +59,14 @@ The following is a detailed description of the tool and suggested usage scenario
 - For materials that are not provided by the user or that you lack, you should try to use existing tools to generate the required materials first, and then perform subsequent steps.
 - Style consistency requires careful reference management
 
+### Hard Constraints (MUST follow):
+
+- **steps array must be non-empty.** `execution_plan.steps` is REQUIRED to contain at least one step. A plan with an empty or missing steps array is INVALID.
+- **Minimize step count.** Use the fewest steps possible. If a single atomic tool can complete the task, use exactly ONE step. Never add unnecessary steps.
+- **Forbidden: repetitive/duplicate steps.** Do NOT chain multiple identical tools in a row (e.g. never output 3+ consecutive `video_extension` calls). If the user asks to extend a video once, use ONE `video_extension`.
+- **Prefer atomic tools over workflows.** `text2video_gen` handles a text-to-video request directly — do NOT escalate to `storyvideo_gen` (storyboard/multi-shot) unless the user explicitly requests a multi-shot story with characters. Similarly, `image2video_gen` handles a single image-to-video request — do NOT escalate to `entity2video`.
+- **Cap at 5 steps.** A single user request must not exceed 5 steps total.
+
 ## Plan Output Format:
 
 Generate a clear, numbered list of steps. Each step should include:
