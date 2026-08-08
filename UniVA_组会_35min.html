@@ -131,7 +131,7 @@
       <tr><td>Understanding</td><td class="st">✓ 完成</td><td>lvu 74.8%，接近论文 76%</td></tr>
       <tr><td>Editing</td><td class="st">△ 部分</td><td>分片编辑链路自实现</td></tr>
       <tr><td>Segmentation</td><td class="st">待完成</td><td>需 GPU（Sa2VA）</td></tr>
-      <tr><td>Agent 实验</td><td class="st">进行中</td><td>Single vs Dual / Memory 代码已就绪</td></tr>
+      <tr><td>Agent 实验</td><td class="st">初测完成</td><td>lt2v 小样本：Dual 2/2 vs Single 1/2</td></tr>
     </table>
   </section>
 
@@ -226,8 +226,13 @@
     </div>
     <div class="bullets" style="margin-top:18px">
       <div class="bullet"><span class="dot">·</span>控制变量：同 prompt / 同工具 / 同模型，只变结构</div>
-      <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · wPED 近似评价</div>
-      <div class="bullet"><span class="dot">·</span>Inspired by wPED（参考计划受限，用标准工具链近似）</div>
+      <div class="bullet"><span class="dot">·</span>指标：Success Rate · Tool Sequence · wPED 近似评价（Inspired by wPED）</div>
+    </div>
+    <div class="find" style="margin-top:18px">
+      <h3>小样本初步结果（lt2v n=2）</h3>
+      <p>· Success Rate：<strong>Dual 2/2（100%）vs Single 1/2（50%）</strong><br />
+         · Single 失败原因：<span class="hl">误判请求重复，复用已有结果不生成</span><br />
+         · 趋势符合论文：显式规划减少失败（样本小，待扩展）</p>
     </div>
   </section>
 

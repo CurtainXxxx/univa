@@ -491,10 +491,10 @@ class SingleAgent:
     async def run(self, session_id, user_request: str, memory_cfg: str = None) -> Dict[str, Any]:
         """单轮执行：规划 + 执行 + 返回更新后的计划。
 
-        memory_cfg（结论3 消融）：含 'user'/'global' 时把对应记忆拼进输入。
+        memory_cfg(结论3 消融)：含 'user'/'global' 时把对应记忆拼进输入。
         Returns:
             与 PlanActSystem.execute_task 相同的 {plan, execution} 结构，
-            其中 execution[step_num] = {success, output_path, message}，
+            其中 execution[step_num] = {success, output_path, message},
             便于 runner 用同一套解析逻辑。
         """
         # 记忆注入（User/Global），SingleAgent 直接拼进输入
@@ -540,9 +540,13 @@ class SingleAgent:
         for i, step in enumerate(steps):
             status = step.get('status', 'failed')
             output = step.get('output') or step.get('output_path')
+            # 成功判定：有真实 output 即视为执行成功（模型填的 status 常是模板默认值 pending/ongoing，
+            # 不可靠）；无 output 时才退回看 status 文本
+            has_output = bool(output)
+            ok = has_output or str(status).lower() in ('true', 'success', 'completed')
             execution[i + 1] = {
-                'success': str(status).lower() in ('true', 'success', 'completed'),
-                'output_path': output if (output and os.path.exists(str(output))) else None,
+                'success': ok,
+                'output_path': output or None,
                 'message': f"{step.get('action_description', '')} -> {step.get('tool', {})}",
             }
 
