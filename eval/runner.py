@@ -211,6 +211,8 @@ async def main():
     parser.add_argument("--tasks", required=True, help="逗号分隔: lt2v,it2v,v2v,lve,lvu,seg")
     parser.add_argument("--items", default="0", help="条目索引，逗号分隔: 0,1,2")
     parser.add_argument("--mode", default="agent", choices=["agent", "single", "direct"])
+    parser.add_argument("--memory", default=None,
+                        help="记忆消融: none/task/task+user/task+global/task+user+global")
     parser.add_argument("--mcp-config", default=None, help="MCP 配置文件路径")
     parser.add_argument("--run-id", default="run1")
     args = parser.parse_args()
@@ -225,7 +227,8 @@ async def main():
     if args.mode in ("agent", "single"):
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "univa"))
         from univa.univa_agent import initialize_global_agents
-        system = await initialize_global_agents(mcp_config_path=args.mcp_config)
+        system = await initialize_global_agents(mcp_config_path=args.mcp_config,
+                                                memory_cfg=args.memory)
         method = "single" if args.mode == "single" else "planact"
     else:
         import os

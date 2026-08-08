@@ -49,6 +49,9 @@ _init_env()
 
 from univa.config.config import config
 from univa.utils.model_factory import create_model
+# 结论3：User/Global 记忆模块（消融实验用，memory_cfg 控制开关）
+from univa.memory.user_memory import UserMemory
+from univa.memory.global_memory import GlobalMemory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -128,8 +131,11 @@ class PlanAgent:
     规划阶段只负责"想清楚做什么"，真正调用工具的是 ActAgent。
     """
 
-    def __init__(self, mcp_tools: MultiMCPTools, plan_db):
+    def __init__(self, mcp_tools: MultiMCPTools, plan_db,
+                 user_memory: UserMemory = None, global_memory: GlobalMemory = None):
         self.mcp_tools = mcp_tools
+        self.user_memory = user_memory    # User 记忆（可为 None = 消融关闭）
+        self.global_memory = global_memory  # Global 记忆（可为 None = 消融关闭）
 
         # 指令 = plan.txt（工具清单 + 计划 JSON 格式约束），指导 LLM 如何拆计划
         plan_prompt = load_prompt("plan")
@@ -172,13 +178,18 @@ class PlanAgent:
     def extract_plan_from_content(self, content: str) -> Optional[Dict]:
         return extract_plan_from_content(content)
 
-    async def generate_plan(self, session_id, user_request: str) -> Optional[Dict]:
+    async def generate_plan(self, session_id, user_request: str,
+                            memory_cfg: str = None) -> Optional[Dict]:
         """生成执行计划。
 
-        Task 记忆读取：从 SQLite 里取出本 session 的历史执行记录（execution_history），
-        拼进输入上下文，让模型"记得上一轮做了什么"——这是论文 Task Memory 的读路径。
+        memory_cfg（结论3 消融）：'task'/'user'/'global' 的任意组合（+ 号连接），
+        例如 'task+user+global'。含 'user' 注入用户偏好，含 'global' 注入领域知识。
+        Task 记忆（execution_history）默认总是注入，除非 memory_cfg 明确不含 'task'。
         """
         input_context = f"User Request: {user_request}\n"
+        use_task = not memory_cfg or 'task' in memory_cfg
+        use_user = bool(memory_cfg) and 'user' in memory_cfg
+        use_global = bool(memory_cfg) and 'global' in memory_cfg
 
         # 读记忆：拿到之前所有 {plan, execution_results}
         try:
@@ -187,11 +198,23 @@ class PlanAgent:
             execution_historys = None
 
         # 把历史注入上下文（并提醒只处理最新请求，别重复旧任务）
-        if execution_historys:
+        if use_task and execution_historys:
             input_context += "\n### Previous Execution Results:\n"
             input_context += json.dumps(execution_historys, indent=2, ensure_ascii=False)
             input_context += "\n\nPlease consider the above execution results when generating the new plan.\n"
             input_context += "Note that the new plan step should only include the user's latest request task and not contain steps from previous tasks."
+
+        # User 记忆注入：用户偏好（如"喜欢电影感/暖色调"）
+        if use_user and self.user_memory is not None:
+            user_prompt = self.user_memory.to_prompt("default_user")
+            if user_prompt:
+                input_context += f"\n### User Preferences:\n{user_prompt}\n"
+
+        # Global 记忆注入：按当前请求检索领域知识
+        if use_global and self.global_memory is not None:
+            global_prompt = self.global_memory.retrieve(user_request, top_k=3)
+            if global_prompt:
+                input_context += f"\n### Domain Knowledge:\n{global_prompt}\n"
 
         response = await self.agent.arun(
             input=input_context,
@@ -424,15 +447,19 @@ class SingleAgent:
     """
 
     def __init__(self, mcp_tools: MultiMCPTools = None, db=None,
-                 max_run_seconds: int = 600, tool_call_limit: int = 10):
+                 max_run_seconds: int = 600, tool_call_limit: int = 10,
+                 user_memory: UserMemory = None, global_memory: GlobalMemory = None):
         """Args:
             mcp_tools: MCP 工具。传 None 时构造纯规划 Agent（无工具，零成本，
                 用于 plan_only 对比 Planner 差异）。
             max_run_seconds: 单轮总超时（秒），防止模型循环调用烧钱。
             tool_call_limit: 单轮工具调用上限（一次生成约 $0.3-0.5，控制成本）。
+            user_memory/global_memory: 结论3 记忆模块（可为 None = 消融关闭）。
         """
         self.mcp_tools = mcp_tools
         self.max_run_seconds = max_run_seconds
+        self.user_memory = user_memory
+        self.global_memory = global_memory
 
         plan_prompt = load_prompt("plan")
         full_instructions = f"{plan_prompt}\n\n{SINGLE_ACT_INSTRUCTIONS}"
@@ -461,18 +488,31 @@ class SingleAgent:
             session_state={"execution_history": []},
         )
 
-    async def run(self, session_id, user_request: str) -> Dict[str, Any]:
+    async def run(self, session_id, user_request: str, memory_cfg: str = None) -> Dict[str, Any]:
         """单轮执行：规划 + 执行 + 返回更新后的计划。
 
+        memory_cfg（结论3 消融）：含 'user'/'global' 时把对应记忆拼进输入。
         Returns:
             与 PlanActSystem.execute_task 相同的 {plan, execution} 结构，
             其中 execution[step_num] = {success, output_path, message}，
             便于 runner 用同一套解析逻辑。
         """
+        # 记忆注入（User/Global），SingleAgent 直接拼进输入
+        input_text = user_request
+        if memory_cfg:
+            if 'user' in memory_cfg and self.user_memory is not None:
+                up = self.user_memory.to_prompt("default_user")
+                if up:
+                    input_text += f"\n### User Preferences:\n{up}\n"
+            if 'global' in memory_cfg and self.global_memory is not None:
+                gp = self.global_memory.retrieve(user_request, top_k=3)
+                if gp:
+                    input_text += f"\n### Domain Knowledge:\n{gp}\n"
+
         # 成本护栏：单轮总超时，防止模型循环调用工具/重复生成
         response = await asyncio.wait_for(
             self.agent.arun(
-                input=user_request,
+                input=input_text,
                 stream=False,
                 session_id=session_id,
             ),
@@ -517,7 +557,12 @@ class PlanActSystem:
       - execute_single()   ：Single-Agent 对照（结论2 实验）
     """
 
-    def __init__(self, mcp_command: List[str], db_file: str = "plan_act_system"):
+    def __init__(self, mcp_command: List[str], db_file: str = "plan_act_system",
+                 memory_cfg: str = None):
+        """memory_cfg（结论3 消融）：如 'task+user+global' / 'none' / 'task' 等。
+        按配置创建 User/Global 记忆实例，供 Plan/Single Agent 注入。
+        """
+        self.memory_cfg = memory_cfg
         mcp_tools_path = config.get('mcp_tools_path')
         # MultiMCPTools：管理多个 MCP server 的连接（每个 server 是独立子进程）
         self.mcp_tools = MultiMCPTools(
@@ -535,10 +580,24 @@ class PlanActSystem:
         self.act_agent = None
         self.single_agent = None
 
+        # 结论3：按 memory_cfg 创建 User/Global 记忆（默认关闭）
+        self.user_memory = None
+        self.global_memory = None
+        if memory_cfg:
+            if 'user' in memory_cfg:
+                self.user_memory = UserMemory(
+                    db_path=str(Path(__file__).resolve().parents[1] / "memory_user.db")
+                )
+                self.user_memory.seed_default("default_user")
+            if 'global' in memory_cfg:
+                self.global_memory = GlobalMemory()
+
     async def __aenter__(self):
         """async 上下文进入：先连接 MCP，再创建两个 Agent（懒加载到 execute 时才用）。"""
         await self.mcp_tools.connect()
-        self.plan_agent = PlanAgent(self.mcp_tools, self._plan_db)
+        self.plan_agent = PlanAgent(self.mcp_tools, self._plan_db,
+                                    user_memory=self.user_memory,
+                                    global_memory=self.global_memory)
         self.act_agent = ActAgent(self.mcp_tools)
         return self
 
@@ -546,20 +605,29 @@ class PlanActSystem:
         """async 上下文退出：关闭所有 MCP 子进程。"""
         await self.mcp_tools.close()
 
-    async def execute_single(self, session_id, user_request: str) -> Dict[str, Any]:
+    async def execute_single(self, session_id, user_request: str,
+                             memory_cfg: str = None) -> Dict[str, Any]:
         """Single-Agent 对照执行：同一系统同一 MCP 连接，只换执行方式。
 
-        结论2 实验用：Plan-Act vs Single-Agent 的差异仅在于分工方式，
-        MCP 工具、模型、session 记忆都保持一致。
+        结论2/3 实验用：Plan-Act vs Single-Agent 的差异仅在于分工方式与记忆配置，
+        MCP 工具、模型保持完全一致。memory_cfg 透传给 SingleAgent 注入 User/Global。
         """
         if self.single_agent is None:
-            self.single_agent = SingleAgent(self.mcp_tools, self._plan_db)
-        return await self.single_agent.run(session_id, user_request)
+            self.single_agent = SingleAgent(self.mcp_tools, self._plan_db,
+                                            user_memory=self.user_memory,
+                                            global_memory=self.global_memory)
+        return await self.single_agent.run(session_id, user_request, memory_cfg=memory_cfg)
 
-    async def execute_task(self, session_id, user_request: str) -> Dict[str, Any]:
-        """Plan-Act 主流程（论文核心）：规划 → 执行 → 记忆回写，共三步。"""
+    async def execute_task(self, session_id, user_request: str,
+                           memory_cfg: str = None) -> Dict[str, Any]:
+        """Plan-Act 主流程（论文核心）：规划 → 执行 → 记忆回写，共三步。
+
+        memory_cfg 覆盖系统默认记忆配置（消融实验逐条传），None 用系统默认。
+        """
+        memory_cfg = memory_cfg or self.memory_cfg
         # ① 规划：PlanAgent 拆出执行计划（JSON）
-        execution_plan = await self.plan_agent.generate_plan(session_id, user_request)
+        execution_plan = await self.plan_agent.generate_plan(session_id, user_request,
+                                                             memory_cfg=memory_cfg)
 
         # 防御：PlanAgent 解析失败时返回的是字符串而非 dict
         if not isinstance(execution_plan, dict) or 'execution_plan' not in execution_plan:
@@ -660,10 +728,12 @@ class PlanActSystem:
             yield {'type': 'error', 'content': str(e)}
 
 
-async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem:
+async def initialize_global_agents(mcp_config_path: str = None,
+                                   memory_cfg: str = None) -> PlanActSystem:
     """工厂函数：读 MCP 配置 → 启动所有 server 子进程 → 返回就绪的 PlanActSystem。
 
     mcp_config_path 传 eval/mcp_configs_eval.json 可指定评测用配置（哪些 server 启动）。
+    memory_cfg（结论3 消融）：如 'task+user+global'，决定 User/Global 记忆是否启用。
     """
     config_path = mcp_config_path or config.get('mcp_servers_config')
 
@@ -691,7 +761,7 @@ async def initialize_global_agents(mcp_config_path: str = None) -> PlanActSystem
         mcp_commands = ["npx -y @modelcontextprotocol/server-filesystem /tmp"]
 
     # 启动并连接所有 MCP 子进程
-    global_plan_act_system = PlanActSystem(mcp_command=mcp_commands)
+    global_plan_act_system = PlanActSystem(mcp_command=mcp_commands, memory_cfg=memory_cfg)
     await global_plan_act_system.__aenter__()
 
     logger.info("Global PlanActSystem initialized")
